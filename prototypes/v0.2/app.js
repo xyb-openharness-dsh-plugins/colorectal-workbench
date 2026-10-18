@@ -158,16 +158,34 @@ function domain() {
 const inDomain = (d, t0, t1) => { const t = Date.parse(d); return t >= t0 && t <= t1; };
 const xOf = (t, t0, t1) => CX0 + (t - t0) / Math.max(1, t1 - t0) * (CX1 - CX0);
 
+/* 单调三次插值（Fritsch-Carlson，同 d3 curveMonotoneX）：
+   只平滑折线，且保证曲线段不越过相邻数据点的 y 范围——不会出现"过冲鼓包"式变形 */
 function smoothPath(coords) {
-  if (!coords.length) return '';
-  if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
-  return coords.reduce((d, p, i) => {
-    if (!i) return `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
-    const prev = coords[i - 1], before = coords[i - 2] || prev, after = coords[i + 1] || p;
-    const c1x = prev.x + (p.x - before.x) / 6, c1y = prev.y + (p.y - before.y) / 6;
-    const c2x = p.x - (after.x - prev.x) / 6, c2y = p.y - (after.y - prev.y) / 6;
-    return `${d} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
-  }, '');
+  const n = coords.length;
+  if (!n) return '';
+  if (n === 1) return `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  const dx = [], slope = [];
+  for (let i = 0; i < n - 1; i++) {
+    const ddx = coords[i + 1].x - coords[i].x;
+    dx.push(ddx);
+    slope.push(ddx ? (coords[i + 1].y - coords[i].y) / ddx : 0);
+  }
+  const tan = [slope[0]];
+  for (let i = 1; i < n - 1; i++) {
+    if (slope[i - 1] * slope[i] <= 0) tan.push(0);           // 拐点处切线置平，防鼓包
+    else {
+      const w1 = 2 * dx[i] + dx[i - 1], w2 = dx[i] + 2 * dx[i - 1];
+      tan.push((w1 + w2) / (w1 / slope[i - 1] + w2 / slope[i])); // 调和加权，保证单调
+    }
+  }
+  tan.push(slope[n - 2]);
+  let d = `M ${coords[0].x.toFixed(1)} ${coords[0].y.toFixed(1)}`;
+  for (let i = 0; i < n - 1; i++) {
+    const c1x = coords[i].x + dx[i] / 3, c1y = coords[i].y + tan[i] * dx[i] / 3;
+    const c2x = coords[i + 1].x - dx[i] / 3, c2y = coords[i + 1].y - tan[i + 1] * dx[i] / 3;
+    d += ` C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${coords[i + 1].x.toFixed(1)} ${coords[i + 1].y.toFixed(1)}`;
+  }
+  return d;
 }
 
 /* 治疗条：周期带（化疗周期）+ 评估标记（手术/MDT/基线），两行独立于数据区 */

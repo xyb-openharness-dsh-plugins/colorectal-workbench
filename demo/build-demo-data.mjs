@@ -14,6 +14,18 @@ const P2 = join(ROOT, 'prototypes/v0.2');
 const pts = (arr) => arr.map(([d, v, src]) => ({ d, v, src }));
 const CAT_COLOR = { '肿瘤标志物': '#1b4f8a', '血象': '#a03d5c', '生化': '#9a6410', '电解质': '#2f6f66', '营养': '#4a6fa5', '治疗毒性': '#c2551f', '贝伐监测': '#33608f' };
 const cat = (c) => ({ cat: c, color: CAT_COLOR[c] });
+/* 按指标 key 独立配色：一图秀最多 4 条同屏，必须靠色相区分，不能只靠类别色。
+   原则：类别大方向不变（血象偏红、生化偏金、电解质偏青、营养偏紫），
+   但同屏最常见的组合（CEA/CA19-9/体重/前白蛋白/血压）跨色相拉开。 */
+const KEY_COLOR = {
+  cea: '#1b4f8a', ca199: '#c2551f',
+  hgb: '#a03d5c', wbc: '#c2687f', anc: '#8f2d4a', lym: '#d495a6', plt: '#b3556e',
+  alt: '#9a6410', ast: '#b07c2a', alp: '#c9a04e', tbil: '#8a5510', cr: '#7a5c20', bun: '#a58a45',
+  k: '#2f6f66', na: '#4d9187', ca: '#6fb0a5', mg: '#1f5c53',
+  wt: '#7c5cbf', alb: '#a48ad6', pa: '#6a4aa0',
+  neuro: '#b35a1e', hfs: '#c2551f', diarrhea: '#d0784a', mucositis: '#e09568',
+  bps: '#33608f', bpd: '#7d97b8', proU: '#24486b'
+};
 
 const commonNumeric = (sex) => [
   { key: 'wbc', name: '白细胞', unit: '10⁹/L', dec: 1, band: [3.5, 9.5], note: '不同医院参考区间不合并', ...cat('血象'), points: pts([
@@ -185,7 +197,7 @@ const PROFILE_B = {
 
 /* 组装档案（公共指标按档案复制，避免交叉污染） */
 function assemble(P, sex, prefixDateBase) {
-  const metrics = [...P.extraMetrics, ...commonNumeric(sex)];
+  const metrics = [...P.extraMetrics, ...commonNumeric(sex)].map((m) => ({ ...m, color: KEY_COLOR[m.key] || m.color }));
   return { ...P.meta, path: P.path, molecular: P.molecular, lynch: P.lynch, lines: P.lines, cycles: P.cycles,
     rhythm: P.rhythm, resect: P.resect, stoma: P.stoma, lars: P.lars, viewpoints: P.viewpoints,
     metrics, events: P.events, nutritionNotes: P.nutritionNotes, activity: P.activity, familyTalk: P.familyTalk };
