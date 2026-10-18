@@ -77,7 +77,9 @@ for (const [k, p] of Object.entries(D.profiles)) {
 const TRIALS = D.trials;
 
 /* ---------------- state ---------------- */
-const state = { view: 'dashboard', profile: 'A', agentOpen: false, agentSize: 'std', picked: ['cea', 'wt'], saved: [], sub: {} };
+const state = { view: 'dashboard', profile: 'A', agentOpen: false, agentSize: 'std', sel: ['cea', 'ca199', 'wt'],
+  range: 'all', zoom: 100, toggles: { treatment: true, keypoints: true }, pin: null, saved: [], sub: {} };
+const defaultSel = (k) => (DASH_KEYS[k] || []).filter(c => { const m = METRICS[k][c]; return m && typeof m.points.find(p => typeof p.v === 'number')?.v === 'number'; }).slice(0, 3);
 const P = () => PROFILES[state.profile];
 const M = () => METRICS[state.profile];
 
@@ -113,14 +115,14 @@ function mcard(key, m) {
   const cat = `<span class="cat"><i style="background:${m.color}"></i>${esc(m.cat)}</span>`;
   if (!numeric) {
     return `<button class="mcard" data-mcard="${key}" data-static="1" aria-pressed="false" title="分类记录，不翻面">
-      <span class="mface">${cat}<span class="name">${esc(m.name)}</span>
+      <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
       <span class="na">${esc(last.v)}</span>
       <span class="meta"><span>${esc(last.src)}</span><span class="hint">分类记录</span></span></span></button>`;
   }
   const band = m.band ? `<span class="rec">参考 ${m.band[0]}–${m.band[1]} ${esc(m.unit)}</span>` : `<span class="rec">${esc(last.d)} · ${esc(last.src)}</span>`;
   return `<button class="mcard" data-mcard="${key}" aria-pressed="false" onclick="flipCard('${key}')" title="轻点翻面看参考区间与说明">
     <span class="mcard-inner">
-    <span class="mface">${cat}<span class="name">${esc(m.name)}</span>
+    <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
       <span class="val">${last.v.toFixed(m.dec ?? 1)}<small>${esc(m.unit)}</small></span>
       ${d ? `<span class="delta">较上次 <em>${d.text}${m.unit ? ' ' + esc(m.unit) : ''}</em>（${esc(d.from)}）</span>` : ''}
       ${band}</span>
@@ -129,33 +131,142 @@ function mcard(key, m) {
       <span class="meta"><span>${esc(m.note)}</span><span class="hint">轻点翻回</span></span></span>
     </span></button>`;
 }
-/* 主图：折线 + 参考带 + 治疗节点 */
-function chartSVG(key, m, opts = {}) {
-  const W = 720, H = 260, PL = 46, PR = 14, PT = 18, PB = 34;
-  const pts = (m.points || []).filter(p => typeof p.v === 'number');
-  if (pts.length < 1) return '<div class="empty"><p>暂无可绘制的数值记录。</p></div>';
-  const t0 = new Date(pts[0].d).getTime(), t1 = new Date(pts[pts.length - 1].d).getTime();
-  const span = Math.max(t1 - t0, 86400000 * 14);
-  const X = d => PL + (W - PL - PR) * (new Date(d).getTime() - t0) / span;
-  const vs = pts.map(p => p.v);
-  let lo = Math.min(...vs), hi = Math.max(...vs);
-  if (m.band) { lo = Math.min(lo, m.band[0]); hi = Math.max(hi, m.band[1]); }
-  const pad = (hi - lo) * 0.18 || 1; lo -= pad; hi += pad;
-  const Y = v => PT + (H - PT - PB) * (1 - (v - lo) / (hi - lo));
-  const evs = (EVENTS[state.profile] || []).filter(e => new Date(e.d).getTime() >= t0 - 86400000 && new Date(e.d).getTime() <= t1 + 86400000 * 10);
-  let grid = '', ticks = 4;
-  for (let i = 0; i <= ticks; i++) {
-    const v = lo + (hi - lo) * i / ticks, y = Y(v);
-    grid += `<line class="grid" x1="${PL}" y1="${y}" x2="${W - PR}" y2="${y}"/><text class="tick" x="${PL - 7}" y="${y + 3}" text-anchor="end">${v.toFixed(m.dec === 0 || m.dec ? 0 : 1)}</text>`;
-  }
-  const band = m.band ? `<rect class="band" x="${PL}" y="${Y(m.band[1])}" width="${W - PL - PR}" height="${Y(m.band[0]) - Y(m.band[1])}"><title>参考区间 ${m.band[0]}–${m.band[1]}</title></rect><text class="band-label" x="${W - PR - 4}" y="${Y(m.band[1]) + 12}" text-anchor="end">参考 ${m.band[0]}–${m.band[1]}</text>` : '';
-  const evMark = evs.map(e => `<line class="axis" x1="${X(e.d)}" y1="${PT}" x2="${X(e.d)}" y2="${H - PB}" stroke-dasharray="3 3" opacity=".55"/><text class="band-label" x="${X(e.d)}" y="${H - PB + 15}" text-anchor="middle">${esc(e.label)}</text>`).join('');
-  const path = pts.map((p, i) => `${i ? 'L' : 'M'}${X(p.d).toFixed(1)},${Y(p.v).toFixed(1)}`).join('');
-  const dots = pts.map((p, i) => `<circle class="pt" cx="${X(p.d).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="4.4" fill="${m.color}" data-tip="${esc(p.d)} · ${p.v}${esc(m.unit ? ' ' + m.unit : '')} · ${esc(p.src)}" onmouseenter="showTip(this)" onmouseleave="hideTip()"/>`).join('');
-  return `<div class="chart-wrap"><svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(m.name)}趋势图">${grid}${band}${evMark}<path class="line" d="${path}" stroke="${m.color}"/>${dots}</svg><div class="chart-tip" id="chart-tip"></div></div>`;
+/* ---------------- 一图秀引擎（统一画布 · 多序列归一化 · 移植淋巴瘤基因） ---------------- */
+const CW = 980, CH = 420, CX0 = 62, CX1 = 954, CY0 = 132, CY1 = 366;
+const CAT_ORDER = ['肿瘤标志物', '血象', '生化', '电解质', '营养', '贝伐监测', '治疗毒性'];
+const fmtNum = (v, dec) => typeof v === 'number' ? v.toFixed(dec ?? 1) : String(v ?? '');
+const shortDate = (d) => d.slice(5).replace('-', '.');
+const longDate = (d) => d;
+const numPts = (m) => (m.points || []).filter(p => typeof p.v === 'number');
+const addDays = (d, n) => new Date(Date.parse(d) + n * 86400000).toISOString().slice(0, 10);
+
+function dataBounds() {
+  const ds = [];
+  for (const m of Object.values(M())) for (const p of m.points) ds.push(p.d);
+  for (const e of (EVENTS[state.profile] || [])) ds.push(e.d);
+  ds.sort();
+  return [Date.parse(ds[0]), Date.parse(ds[ds.length - 1])];
 }
-function showTip(el) { const tip = $('#chart-tip'); if (!tip) return; tip.textContent = el.dataset.tip; tip.classList.add('on'); }
-function hideTip() { const tip = $('#chart-tip'); if (tip) tip.classList.remove('on'); }
+function domain() {
+  const [s, e] = dataBounds();
+  const months = { '3m': 3, '6m': 6, '12m': 12 }[state.range];
+  const start = months ? new Date(new Date(e).setMonth(new Date(e).getMonth() - months)) : new Date(s);
+  const span = e - start.getTime();
+  const kept = span * state.zoom / 100;
+  return [e - kept, e];
+}
+const inDomain = (d, t0, t1) => { const t = Date.parse(d); return t >= t0 && t <= t1; };
+const xOf = (t, t0, t1) => CX0 + (t - t0) / Math.max(1, t1 - t0) * (CX1 - CX0);
+
+function smoothPath(coords) {
+  if (!coords.length) return '';
+  if (coords.length === 1) return `M ${coords[0].x} ${coords[0].y}`;
+  return coords.reduce((d, p, i) => {
+    if (!i) return `M ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+    const prev = coords[i - 1], before = coords[i - 2] || prev, after = coords[i + 1] || p;
+    const c1x = prev.x + (p.x - before.x) / 6, c1y = prev.y + (p.y - before.y) / 6;
+    const c2x = p.x - (after.x - prev.x) / 6, c2y = p.y - (after.y - prev.y) / 6;
+    return `${d} C ${c1x.toFixed(1)} ${c1y.toFixed(1)} ${c2x.toFixed(1)} ${c2y.toFixed(1)} ${p.x.toFixed(1)} ${p.y.toFixed(1)}`;
+  }, '');
+}
+
+/* 治疗条：周期带（化疗周期）+ 评估标记（手术/MDT/基线），两行独立于数据区 */
+function bandsFor(t0, t1) {
+  const p = P(), items = [];
+  p.cycles.forEach((c, i) => {
+    const from = c[1];
+    const to = c[4] && p.cycles[i + 1] ? p.cycles[i + 1][1] : addDays(from, 21);
+    items.push({ kind: 'cycle', from, to, label: c[0], color: '#1b4f8a' });
+  });
+  (EVENTS[state.profile] || []).forEach((e) => {
+    if (/手术|MDT|基线/.test(e.label)) items.push({ kind: 'mark', from: e.d, to: e.d, label: e.label, color: e.label.includes('手术') ? '#a03d5c' : '#9a6410' });
+  });
+  return items.filter((tr) => Date.parse(tr.to) >= t0 && Date.parse(tr.from) <= t1)
+    .sort((a, b) => Date.parse(a.from) - Date.parse(b.from))
+    .map((tr, lane) => { const s = Math.max(Date.parse(tr.from), t0), e2 = Math.min(Date.parse(tr.to), t1); return { ...tr, x1: xOf(s, t0, t1), x2: xOf(e2, t0, t1), lane }; });
+}
+
+function monthTicks(t0, t1) {
+  const out = []; const d = new Date(t0); let cur = new Date(d.getFullYear(), d.getMonth(), 1);
+  if (cur.getTime() < t0) cur.setMonth(cur.getMonth() + 1);
+  while (cur.getTime() <= t1) {
+    const x = xOf(cur.getTime(), t0, t1);
+    if (x > CX0 + 6 && x < CX1 - 6) out.push({ x, label: `${cur.getMonth() + 1}月` });
+    cur = new Date(cur.getFullYear(), cur.getMonth() + 1, 1);
+  }
+  if (out.length > 7) return out.filter((_, i) => i % 2 === 0);
+  return out;
+}
+
+function seriesFor(code, t0, t1) {
+  const m = M()[code];
+  const all = numPts(m).map((p) => p.v);
+  const lo = Math.min(...all), hi = Math.max(...all);
+  const span = hi - lo || Math.max(Math.abs(hi) * 0.08, 1);
+  const pts = numPts(m).filter((p) => inDomain(p.d, t0, t1));
+  return { code, m, lo, hi, span, pts };
+}
+
+function chartSVG(t0, t1) {
+  const bands = state.toggles.treatment ? bandsFor(t0, t1) : [];
+  const series = state.sel.filter((c) => M()[c]).map((c) => seriesFor(c, t0, t1)).filter((s) => s.pts.length);
+  if (!series.length) return `<div class="empty"><h3>这个时间窗里没有所选指标</h3><p>扩大时间范围，或在左侧加选一个指标。</p></div>`;
+  const yOf = (s, v) => CY1 - (v - s.lo) / s.span * (CY1 - CY0);
+  const grid = [0, 1, 2, 3, 4].map((i) => { const y = CY0 + i * (CY1 - CY0) / 4; return `<line class="grid" x1="${CX0}" x2="${CX1}" y1="${y}" y2="${y}"/>`; }).join('');
+
+  const strip = bands.map((b) => {
+    if (b.kind === 'mark') {
+      const x = b.x1.toFixed(1), row = 64;
+      return `<g><path d="M ${x} ${row - 4} l4 4 -4 4 -4 -4 Z" fill="${b.color}"/>
+        <text x="${(+x + 8).toFixed(1)}" y="${row + 3.5}" font-size="9.5" fill="${b.color}" font-weight="600">${esc(b.label)}</text></g>`;
+    }
+    const w = Math.max(b.x2 - b.x1, 7).toFixed(1);
+    return `<g><rect x="${b.x1.toFixed(1)}" y="36" width="${w}" height="8" rx="4" fill="${b.color}" opacity=".3"/>
+      <text x="${(b.x1 + 1).toFixed(1)}" y="30" font-size="9" fill="${b.color}" font-weight="500">${esc(b.label)}</text></g>`;
+  }).join('');
+
+  const markLines = bands.filter((b) => b.kind === 'mark').map((b) =>
+    `<line x1="${b.x1.toFixed(1)}" x2="${b.x1.toFixed(1)}" y1="${CY0}" y2="${CY1}" stroke="${b.color}" stroke-width="1.2" stroke-dasharray="3 6" opacity=".45"/>`).join('');
+
+  // 末点标签：按 y 排序强制最小间距 13px，右端左锚定，防叠字
+  const lastPos = series.map((s) => {
+    const c = s.pts.map((p) => ({ x: xOf(Date.parse(p.d), t0, t1), y: yOf(s, p.v) }));
+    const last = c[c.length - 1];
+    return { s, x: last.x, y: last.y, v: s.pts[s.pts.length - 1].v };
+  }).sort((a, b) => a.y - b.y);
+  let cursor = -Infinity;
+  for (const it of lastPos) { it.ly = Math.max(it.y, cursor + 13); cursor = it.ly; }
+  const overflow = lastPos.length ? Math.max(0, lastPos[lastPos.length - 1].ly - (CY1 + 2)) : 0;
+  if (overflow) for (const it of lastPos) it.ly -= overflow;
+
+  const lines = series.map((s) => {
+    const coords = s.pts.map((p) => ({ x: xOf(Date.parse(p.d), t0, t1), y: yOf(s, p.v) }));
+    const path = s.pts.length > 1 ? `<path class="line" d="${smoothPath(coords)}" stroke="${s.m.color}" pathLength="1"/>` : '';
+    const points = coords.map((c, i) => {
+      const p = s.pts[i];
+      const isLast = i === s.pts.length - 1;
+      const r = isLast ? 5.2 : (i === 0 ? 4.6 : 4);
+      const active = state.pin && state.pin.code === s.code && state.pin.date === p.d;
+      return `<circle class="pt${active ? ' active' : ''}" cx="${c.x.toFixed(1)}" cy="${c.y.toFixed(1)}" r="${r}" fill="${s.m.color}" data-action="pin" data-code="${s.code}" data-date="${p.d}"/>`;
+    }).join('');
+    const lp = lastPos.find((x) => x.s === s);
+    const nearRight = lp.x > CX1 - 44;
+    const lx = nearRight ? lp.x - 8 : lp.x + 8;
+    const label = state.toggles.keypoints
+      ? `<text class="delta-tag" x="${lx.toFixed(1)}" y="${(lp.ly + 4).toFixed(1)}" text-anchor="${nearRight ? 'end' : 'start'}" fill="${s.m.color}">${fmtNum(lp.v, s.m.dec)}</text>` : '';
+    return `<g>${path}${points}${label}</g>`;
+  }).join('');
+
+  const ticks = monthTicks(t0, t1).map((t) => `<line class="axis" x1="${t.x.toFixed(1)}" x2="${t.x.toFixed(1)}" y1="${CY1}" y2="${CY1 + 5}"/><text class="tick" x="${t.x.toFixed(1)}" y="${CY1 + 18}" text-anchor="middle">${t.label}</text>`).join('');
+  const rowLabels = state.toggles.treatment
+    ? `<text x="6" y="34" font-size="9" fill="#8fa1b5">周期</text><text x="6" y="68" font-size="9" fill="#8fa1b5">评估</text>`
+    : '';
+
+  return `<svg class="chart" viewBox="0 0 ${CW} ${CH}" role="img" aria-label="所选指标的时序图，共 ${series.length} 条序列">
+    ${grid}${ticks}${markLines}${strip}${rowLabels}${lines}
+    <text class="tick" x="${CX0}" y="${CY1 + 36}">各序列按自身全部记录的最小值–最大值归一化，不代表数值可比</text>
+  </svg>`;
+}
 
 const pageHead = (sub) => `<div class="page-head"><div><h1>${esc(PAGES.find(p => p[0] === state.view)[1])}</h1><p>${esc(SUBTITLES[state.view])}</p></div></div>${sub ? `<div class="subnav" role="tablist">${SUBPAGES[state.view].map((s, i) => `<button role="tab" aria-selected="${(state.sub[state.view] || 0) === i}" data-sub="${i}">${esc(s)}</button>`).join('')}</div>` : ''}`;
 const row = (b, p, right = '') => `<div class="row"><div class="row-main"><div><b>${b}</b>${p ? `<p>${p}</p>` : ''}</div></div>${right}</div>`;
@@ -266,19 +377,50 @@ function vLabs() {
 }
 
 function vTimeline() {
-  const m = M(), all = Object.keys(m).filter(k => m[k].dec !== null);
-  const picked = state.picked.filter(k => m[k]);
-  const pickList = all.map(k => `<label class="metric-pick"><input type="checkbox" data-pick="${k}" ${picked.includes(k) ? 'checked' : ''}><i style="background:${m[k].color}"></i><span>${esc(m[k].name)}</span><small>${m[k].points.filter(p => typeof p.v === 'number').length} 点</small></label>`).join('');
-  const charts = picked.map(k => `<div class="chart-panel"><div class="chart-top"><div><h3>${esc(m[k].name)}${m[k].unit ? ' <small class="muted">(' + esc(m[k].unit) + ')</small>' : ''}</h3>
-    <div class="legend"><span><i style="background:${m[k].color}"></i><b>${esc(m[k].name)}</b>${m[k].band ? `<span class="range">参考 ${m[k].band[0]}–${m[k].band[1]}</span>` : '<span class="range">无固定参考带</span>'}</span></div></div>
-    <small class="muted">虚线 = 治疗节点</small></div>${chartSVG(k, m[k])}</div>`).join('');
-  const qual = Object.keys(m).filter(k => m[k].dec === null).map(k => row(`<b>${esc(m[k].name)}</b>`, m[k].points.map(p => `${p.d}：${p.v}（${p.src}）`).join('；<br>') || '暂无')).join('');
+  const m = M();
+  const [t0, t1] = domain();
+  const series = state.sel.filter((c) => m[c]).map((c) => seriesFor(c, t0, t1)).filter((s) => s.pts.length);
+  const groups = CAT_ORDER.map((cat) => ({ cat, codes: Object.keys(m).filter((k) => m[k].cat === cat) })).filter((g) => g.codes.length);
+  const pinData = state.pin && m[state.pin.code] ? m[state.pin.code].points.find((p) => p.d === state.pin.date) : null;
+  const [bs, be] = dataBounds();
+  const rng = `${shortDate(new Date(bs).toISOString().slice(0, 10))} – ${shortDate(new Date(be).toISOString().slice(0, 10))}`;
   return `<div class="page-enter">${pageHead(true)}
-  <div class="overview"><div class="rail"><h3>选择要看的指标</h3><div class="metric-list">${pickList}</div>
-    <section><div class="zoom"><input type="range" min="60" max="140" value="100" data-zoom aria-label="缩放"><span>100%</span></div></section>
-    <section><h3>分类记录（不连线）</h3>${qual}</section>
-    <section><h3>口径提醒</h3><p class="small-note" style="margin-top:0">换医院、换检测方法的结果都会标出来，不合并画线；分类变量只按节点呈现。</p></section></div>
-  <div class="timeline-main">${charts || '<div class="empty">请至少勾选一个数值指标。</div>'}</div></div></div>`;
+  <div class="chips" style="margin:0 0 14px" aria-label="时间范围">${[['3m', '近 3 月'], ['6m', '近 6 月'], ['12m', '近 12 月'], ['all', '全期']].map(([k, l]) => `<button class="chip" aria-pressed="${state.range === k}" data-action="range" data-range="${k}">${l}</button>`).join('')}</div>
+  <div class="overview">
+    <aside class="rail" aria-label="筛选与指标选择">
+      <details class="pick" ${state.sel.length && (typeof window !== 'undefined' && window.innerWidth > 900 ? 'open' : '')}>
+        <summary>选择指标 <small>最多 4 个 · 已选 ${state.sel.length}</small></summary>
+        <div class="metric-list">
+          ${groups.map((g) => `<div class="cat-label">${esc(g.cat)}</div>${g.codes.filter((c) => numPts(m[c]).length).map((c) => `<label class="metric-pick"><input type="checkbox" ${state.sel.includes(c) ? 'checked' : ''} data-pick="${c}"><i style="background:${m[c].color}"></i><span>${esc(m[c].name)}</span><small>${numPts(m[c]).length} 次</small></label>`).join('')}`).join('')}
+        </div>
+      </details>
+      <section><h3>显示</h3>
+        <div class="chips">
+          <button class="chip" aria-pressed="${state.toggles.treatment}" data-action="toggle" data-key="treatment">治疗节点</button>
+          <button class="chip" aria-pressed="${state.toggles.keypoints}" data-action="toggle" data-key="keypoints">末点数值</button>
+        </div>
+      </section>
+      <section><h3>时间窗缩放</h3>
+        <div class="zoom"><input type="range" min="40" max="100" value="${state.zoom}" data-action="zoom" aria-label="时间窗缩放"><span>${state.zoom}%</span></div>
+        <p class="small-note">右端锚定最新记录；40% 表示只看最近四成时间。</p>
+      </section>
+      <section><h3>口径</h3><p class="small-note">每条线按该指标全部记录的最小值–最大值归一化，只用于同屏回顾，不能比较不同指标的绝对值；换医院、换方法的结果以来源标注区分。</p></section>
+    </aside>
+    <div class="timeline-main">
+      <div class="chart-panel">
+        <div class="chart-top">
+          <div><h2 style="font-size:15px">${series.length} 条序列 · ${state.range === 'all' ? '全期' : '近 ' + state.range.replace('m', ' 月')}</h2><p class="small-note">点击数据点固定详情；治疗条与数据区分离，不压曲线。</p></div>
+          <span class="pill grey">${rng}</span>
+        </div>
+        <div class="legend">${series.map((s) => `<span><i style="background:${s.m.color}"></i><b>${esc(s.m.name)}</b><span class="range">${fmtNum(s.lo, s.m.dec)}–${fmtNum(s.hi, s.m.dec)} ${esc(s.m.unit)}</span></span>`).join('')}</div>
+        <p class="scroll-hint small-note">图表可左右滑动</p>
+        <div class="chart-wrap">${chartSVG(t0, t1)}</div>
+        ${pinData ? `<div class="pin"><div><b>${esc(m[state.pin.code].name)} · ${fmtNum(pinData.v, m[state.pin.code].dec)} ${esc(m[state.pin.code].unit)}</b><p>${esc(longDate(pinData.d))} · 来源：${esc(pinData.src)}</p></div><button class="icon-button" data-action="unpin" aria-label="关闭详情">×</button></div>` : ''}
+      </div>
+      <div class="section-title"><h2>指标卡片</h2><span class="source-link">点一张卡翻到背面；每张卡互不影响</span></div>
+      ${groups.map((g) => `<div class="metric-group"><div class="metric-group-head"><h3>${esc(g.cat)}</h3><span>${g.codes.length} 项</span></div><div class="metric-grid">${g.codes.map((k) => mcard(k, m[k])).join('')}</div></div>`).join('')}
+    </div>
+  </div></div>`;
 }
 
 function vNutrition() {
@@ -360,7 +502,7 @@ const PAGE_CONTEXT = {
   treatment: () => ({ facts: P().cycles.map(c => `${c[0]} ${c[1]} ${c[2]}（${c[3]}）`), missing: P().resect ? ['下次 MDT 评估是否手术的具体结论'] : ['第 3 周期起日期'] }),
   stoma: () => ({ facts: P().stoma ? [`造口：${P().stoma.type}（${P().stoma.date}）`, `日记最近一条：${P().stoma.diary[0].join(' · ')}`] : ['本档案无造口'], missing: P().stoma ? ['造口门诊最近一次记录'] : [] }),
   labs: () => ({ facts: Object.values(M()).filter(m => m.points && m.points.length).map(m => `${m.name} 最近：${String(m.points.slice(-1)[0].v)}（${m.points.slice(-1)[0].d}）`), missing: ['CA19-9（A 档案未查）'] }),
-  timeline: () => ({ facts: ['一图秀当前勾选：' + state.picked.map(k => M()[k].name).join('、')], missing: [] }),
+  timeline: () => ({ facts: ['一图秀当前勾选：' + state.sel.map(k => M()[k].name).join('、')], missing: [] }),
   nutrition: () => ({ facts: [`体重最近：${M().wt.points.slice(-1)[0].v} kg（${M().wt.points.slice(-1)[0].d}）`], missing: ['营养科随诊记录'] }),
   mind: () => ({ facts: ['本页内容默认私密，提示词不携带具体感受原文'], missing: [] }),
   review: () => ({ facts: P().rhythm.map(r => `${r[0]}：${r[1]}（${r[2]}）`), missing: ['想问清单中 1 条待确认'] }),
@@ -465,7 +607,6 @@ function render() {
   $('#main').classList.remove('page-enter');
   renderAgent();
   if (state.agentOpen) $('#agent-body').dataset.built = ''; // 换页后重建挂载位提示
-  renderAgent();
 }
 
 /* ---------------- events ---------------- */
@@ -477,12 +618,17 @@ document.addEventListener('click', (e) => {
   const pick = e.target.closest('[data-pick]');
   if (pick) {
     const k = pick.dataset.pick;
-    if (pick.checked) { if (!state.picked.includes(k)) state.picked.push(k); }
-    else state.picked = state.picked.filter(x => x !== k);
+    if (pick.checked) {
+      if (state.sel.length >= 4) { pick.checked = false; toast('最多同时看 4 个指标；取消一个再加。'); return; }
+      if (!state.sel.includes(k)) state.sel.push(k);
+    } else {
+      if (state.sel.length === 1) { pick.checked = true; toast('至少留一个指标。'); return; }
+      state.sel = state.sel.filter(x => x !== k);
+    }
     render(); return;
   }
   const pp = e.target.closest('[data-pick-profile]');
-  if (pp) { state.profile = pp.dataset.pickProfile; state.picked = ['cea', 'wt']; closeDialog(); render(); toast(`已切换到 ${P().name}的资料（演示）`); return; }
+  if (pp) { state.profile = pp.dataset.pickProfile; state.sel = defaultSel(pp.dataset.pickProfile); state.pin = null; closeDialog(); render(); toast(`已切换到 ${P().name}的资料（演示）`); return; }
   const act = e.target.closest('[data-action]')?.dataset.action;
   if (!act) return;
   const map = {
@@ -503,6 +649,11 @@ document.addEventListener('click', (e) => {
     'toggle-ask': (el) => { el.textContent = el.textContent.includes('✓') ? '标记已问' : '已问过 ✓'; },
     'save-trial': (el) => { const id = el.closest('[data-action]').dataset.id ?? el.dataset.id; if (state.saved.includes(id)) { state.saved = state.saved.filter(x => x !== id); } else state.saved.push(id); render(); },
     'ask-trial': (el) => { const id = el.closest('[data-action]').dataset.id ?? el.dataset.id; const t = TRIALS.find(x => x.id === id); state.questions = state.questions || []; const q = `${t.id}：入组条件是否包含我的分期与既往治疗？`; if (!state.questions.includes(q)) state.questions.push(q); render(); toast('已加入入组问题清单'); },
+    range: (el) => { state.range = el.dataset.range; render(); },
+    toggle: (el) => { state.toggles[el.dataset.key] = !state.toggles[el.dataset.key]; render(); },
+    pin: (el) => { state.pin = { code: el.dataset.code, date: el.dataset.date }; render(); },
+    unpin: () => { state.pin = null; render(); },
+    zoom: () => {},
     agent: () => { state.agentOpen = !state.agentOpen; renderAgent(); },
     'agent-build': agentBuild,
     'agent-demo': agentDemo
@@ -511,7 +662,11 @@ document.addEventListener('click', (e) => {
   if (map[act]) map[act](e.target.closest('[data-action]'));
 });
 document.addEventListener('input', (e) => {
-  if (e.target.matches('[data-zoom]')) { e.target.nextElementSibling.textContent = e.target.value + '%'; const svg = $('#main .chart'); if (svg) svg.style.width = e.target.value + '%'; }
+  if (e.target.matches('[data-action="zoom"]')) { const sib = e.target.nextElementSibling; if (sib) sib.textContent = e.target.value + '%'; }
+});
+document.addEventListener('change', (e) => {
+  const el = e.target.closest('[data-action]');
+  if (el && el.dataset.action === 'zoom') { state.zoom = Number(el.value); render(); }
 });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#dialog').open) closeDialog(); });
 $('#font-toggle').addEventListener('click', () => { const on = document.body.classList.toggle('large'); $('#font-toggle').setAttribute('aria-pressed', String(on)); });
