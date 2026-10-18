@@ -28,7 +28,8 @@ const icons = {
   heart: 'M12 20.3c-4.6-2.9-7.4-5.6-7.4-9A4.1 4.1 0 0 1 12 8.4a4.1 4.1 0 0 1 7.4 2.9c0 3.4-2.8 6.1-7.4 9Z',
   calendar: 'M4 5h16v16H4ZM8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 3h2',
   flask: 'M9 3h6v5l5 9a2 2 0 0 1-2 3H6a2 2 0 0 1-2-3l5-9Z',
-  folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z'
+  folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z',
+  chat: 'M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10l-6 5V5ZM8 8h8M8 11h5'
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[k]}"/></svg>`;
 
@@ -305,6 +306,7 @@ function vDashboard() {
   const tasks = [];
   if (p.stoma) tasks.push(['stoma', '今天的造口日记', '三键记录：用品 / 皮肤 / 排泄，约 30 秒', 'go-stoma']);
   tasks.push(['records', '报告看不懂？先理资料', '上传 → 解析 → 核对 → 入库，原件始终保留', 'go-records']);
+  tasks.push(['chat', '和 AI 理一理这一页', '生成可预览的提示词草稿；发送前你确认', 'agent-open']);
   tasks.push(['review', '准备下次复诊清单', '想问的事 + 我的看法，两区分开导出', 'go-review']);
   tasks.push(['labs', '本周期检验结果', '第 2 周期血象已录入', 'go-labs']);
   const taskCards = tasks.map(t => `<button class="task-entry" data-action="${t[3]}"><span class="entry-icon">${icon(t[0])}</span><b>${t[1]}</b><span>${t[2]}</span><span class="arrow">›</span></button>`).join('');
@@ -314,7 +316,7 @@ function vDashboard() {
   const cards = (DASH_KEYS[state.profile] || []).filter(k => m[k]).map(k => mcard(k, m[k])).join('');
   return `<div class="page-enter">${pageHead()}
   <div class="hero"><div><span class="eyebrow">当前情况</span><h1>${esc(p.headline)}</h1><p>${esc(p.mindset)}</p>
-    <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button></div></div>
+    <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button><button class="soft" data-action="agent-open">${icon('chat')}AI 对话</button></div></div>
     <div class="hero-mascot" aria-hidden="true"><span style="font-size:56px">🫂</span></div></div>
   ${alertNext}
   <div class="intent"><i>✓</i><span>工作台只做<b>记录与整理</b>；诊断、方案调整由医生决定。页面里全部资料为<b>演示数据</b>。</span></div>
@@ -790,11 +792,10 @@ function dlgHelp() {
 function dlgExport() {
   const p = P();
   const md = ['# 复诊准备（演示导出）', '', `档案：${p.name}（${p.meta}）`, '', '## 事实区（已核对）', ...p.rhythm.map(r => `- ${r[0]}：${r[1]}（${r[2]}）`), '', '## 想问的事 / 我的看法（不是医生结论）', '- （按页面勾选结果导出；私密条目默认不含）', '', '> 本文件由工作台整理，不构成医疗建议。'].join('\n');
-  openDialog('小畅宝', '导出预览（Markdown）', `
-    <div id="export-view" class="agent-card"><pre>${esc(md)}</pre></div>
-    <textarea id="export-edit" hidden aria-label="编辑导出内容" style="width:100%;min-height:240px;font:12px/1.7 ui-monospace,SFMono-Regular,monospace;padding:10px;border:1px solid var(--line,#d8e0ea);border-radius:10px;background:#fff;color:var(--ink,#213139)">${esc(md)}</textarea>
-    <p class="small-note">导出分两区；「我的看法」永远带"不是医生结论"标注。可先编辑再保存，保存的是编辑后的全文。</p>`,
-    '<button class="soft" data-action="close">取消</button><button class="soft" data-action="export-toggle-edit" id="export-edit-btn">编辑</button><button class="primary" data-action="export-save">保存到资料目录</button>');
+  openDialog('小畅宝', '导出编辑（Markdown）', `
+    <textarea id="export-edit" aria-label="导出内容，可直接编辑" style="width:100%;min-height:320px;font:12px/1.7 ui-monospace,SFMono-Regular,monospace;padding:12px;border:1px solid #d8e0ea;border-radius:10px;background:#fff;color:#213139;resize:vertical">${esc(md)}</textarea>
+    <p class="small-note">直接在上方编辑；「我的看法」区永远带"不是医生结论"标注。保存到资料目录的是编辑后的全文。</p>`,
+    '<button class="soft" data-action="close">取消</button><button class="primary" data-action="export-save">保存到资料目录</button>');
 }
 
 /* ---------------- render root ---------------- */
@@ -875,17 +876,10 @@ document.addEventListener('click', (e) => {
       openDialog('小畅宝', '原文出处', `<p style="font-size:12.5px">${esc(line)}</p><p class="small-note">原件存放在你选的资料目录 imports/ 下；工作区不改动原文，也不替你解释它。</p>`, '<button class="primary" data-action="close">关闭</button>');
     },
     'pick-file': () => { const inp = $('#file-picker'); if (inp && typeof inp.click === 'function') inp.click(); else toast('当前浏览器不支持选择本机文件'); },
-    'export-toggle-edit': () => {
-      const view = $('#export-view'), ta = $('#export-edit'), btn = $('#export-edit-btn');
-      if (!view || !ta) return;
-      const editing = !ta.hidden;
-      ta.hidden = editing; view.hidden = editing;
-      if (btn) btn.textContent = editing ? '编辑' : '预览';
-    },
     'export-save': () => {
       const ta = $('#export-edit');
-      const txt = ta && !ta.hidden ? ta.value.trim() : '';
-      if (!txt) { toast('导出内容是空的；取消编辑或先填一点内容。'); return; }
+      const txt = ta ? ta.value.trim() : '';
+      if (!txt) { toast('导出内容是空的；先填一点内容再保存。'); return; }
       const docs = DOCS[state.profile];
       docs.unshift({ id: 'ex' + Date.now().toString(36), name: `复诊准备 · ${P().name} · ${todayISO()}`, fileName: `复诊准备-${todayISO()}.md`, size: new Blob([txt]).size, date: todayISO(), type: '其他', status: '待核对', note: '生成文件 · 由导出创建，可在草稿里核对' });
       closeDialog();
@@ -946,6 +940,7 @@ document.addEventListener('click', (e) => {
     unpin: () => { state.pin = null; render(); },
     zoom: () => {},
     agent: () => { state.agentOpen = !state.agentOpen; renderAgent(); },
+    'agent-open': () => { state.agentOpen = true; renderAgent(); toast('AI 对话面板已打开；× 只是收起，不会结束会话'); },
     'agent-build': agentBuild,
     'agent-demo': agentDemo
   };
