@@ -27,17 +27,19 @@ const icons = {
   leaf: 'M20 4c-9.4 0-15 4.1-15 9.6A5.4 5.4 0 0 0 10.4 19C16 19 20 13.4 20 4ZM5.5 18.6C8 13.4 12 10.6 17 9.6',
   heart: 'M12 20.3c-4.6-2.9-7.4-5.6-7.4-9A4.1 4.1 0 0 1 12 8.4a4.1 4.1 0 0 1 7.4 2.9c0 3.4-2.8 6.1-7.4 9Z',
   calendar: 'M4 5h16v16H4ZM8 3v4m8-4v4M4 10h16m-12 4h2m4 0h2m-8 3h2',
-  flask: 'M9 3h6v5l5 9a2 2 0 0 1-2 3H6a2 2 0 0 1-2-3l5-9Z'
+  flask: 'M9 3h6v5l5 9a2 2 0 0 1-2 3H6a2 2 0 0 1-2-3l5-9Z',
+  folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z'
 };
 const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[k]}"/></svg>`;
 
 const PAGES = [
-  ['dashboard', '看板', 'home'], ['subtype', '我的分型', 'badge'], ['treatment', '治疗历程', 'drip'],
+  ['dashboard', '看板', 'home'], ['records', '病情整理', 'folder'], ['subtype', '我的分型', 'badge'], ['treatment', '治疗历程', 'drip'],
   ['stoma', '肠道功能与造口', 'stoma'], ['labs', '检查与指标', 'lab'], ['timeline', '病情一图秀', 'chart'],
   ['nutrition', '营养支持', 'leaf'], ['mind', '心理支持', 'heart'], ['review', '复诊准备', 'calendar'],
   ['trials', '临床研究', 'flask']
 ];
 const SUBPAGES = {
+  records: ['资料库', '整理草稿 / 核对', '病情档案', '指标检测', '病情汇总'],
   subtype: ['分子分型矩阵', '分期与病理', 'Lynch 筛查', '会诊与二次意见'],
   treatment: ['治疗线与方案', '周期与用药', '可切除性评估'],
   stoma: ['造口档案', '三键日记', 'LARS 自查', '肠镜与息肉随访'],
@@ -50,6 +52,7 @@ const SUBPAGES = {
 };
 const SUBTITLES = {
   dashboard: '分型、造口与每一次复查放在一起，让下一次讨论有据可查。',
+  records: '上传 → 解析 → 确认指标 → 入库；原件永远保留，接受之前都只是候选。',
   subtype: '分子分型是方案选择的起点；这里保存依据原文，不替你解释病理。',
   treatment: '按治疗线整理方案、周期与评估，改过的计划也留痕。',
   stoma: '造口与肠道功能是每天的事；每条记录 30 秒内，漏记不催不补。',
@@ -63,22 +66,26 @@ const SUBTITLES = {
 
 /* ---------------- 数据层（由 demo/build-demo-data.mjs 生成；改数据请改生成器重跑） ---------------- */
 const D = window.DEMO_DATA;
-const PROFILES = {}, METRICS = {}, EVENTS = {}, DASH_KEYS = {};
+const PROFILES = {}, METRICS = {}, EVENTS = {}, DASH_KEYS = {}, DOCS = {}, CANDS = {};
 for (const [k, p] of Object.entries(D.profiles)) {
   PROFILES[k] = { name: p.name, sex: p.sex, age: p.age, meta: p.meta, headline: p.headline, stage: p.stage, mindset: p.mindset,
     molecular: p.molecular, lynch: p.lynch, path: p.path, lines: p.lines, cycles: p.cycles, rhythm: p.rhythm,
     resect: p.resect, stoma: p.stoma, lars: p.lars, viewpoints: p.viewpoints,
-    nutritionNotes: p.nutritionNotes, activity: p.activity, familyTalk: p.familyTalk };
+    nutritionNotes: p.nutritionNotes, activity: p.activity, familyTalk: p.familyTalk,
+    docs: p.docs || [], candidates: p.candidates || [], pathology: p.pathology || null };
   METRICS[k] = {};
   for (const m of p.metrics) METRICS[k][m.key] = m;
   EVENTS[k] = p.events;
   DASH_KEYS[k] = p.dash_keys;
+  DOCS[k] = (p.docs || []).map(d => ({ ...d }));
+  CANDS[k] = (p.candidates || []).map(c => ({ ...c }));
 }
 const TRIALS = D.trials;
 
 /* ---------------- state ---------------- */
 const state = { view: 'dashboard', profile: 'A', agentOpen: false, agentSize: 'std', sel: ['cea', 'ca199', 'wt'],
-  range: 'all', zoom: 100, toggles: { treatment: true, keypoints: true }, pin: null, saved: [], sub: {} };
+  range: 'all', zoom: 100, toggles: { treatment: true, keypoints: true }, pin: null, saved: [], sub: {},
+  query: '', parsing: false, parseError: false, loaded: {} };
 const defaultSel = (k) => (DASH_KEYS[k] || []).filter(c => { const m = METRICS[k][c]; return m && typeof m.points.find(p => typeof p.v === 'number')?.v === 'number'; }).slice(0, 3);
 const P = () => PROFILES[state.profile];
 const M = () => METRICS[state.profile];
@@ -297,6 +304,7 @@ function vDashboard() {
   const alertNext = `<div class="alert-strip"><div><b>下一次节点：${esc(next[0])}</b><p>${esc(next[3])}</p></div><button class="soft" data-action="go-review">看监测节奏</button></div>`;
   const tasks = [];
   if (p.stoma) tasks.push(['stoma', '今天的造口日记', '三键记录：用品 / 皮肤 / 排泄，约 30 秒', 'go-stoma']);
+  tasks.push(['records', '报告看不懂？先理资料', '上传 → 解析 → 核对 → 入库，原件始终保留', 'go-records']);
   tasks.push(['review', '准备下次复诊清单', '想问的事 + 我的看法，两区分开导出', 'go-review']);
   tasks.push(['labs', '本周期检验结果', '第 2 周期血象已录入', 'go-labs']);
   const taskCards = tasks.map(t => `<button class="task-entry" data-action="${t[3]}"><span class="entry-icon">${icon(t[0])}</span><b>${t[1]}</b><span>${t[2]}</span><span class="arrow">›</span></button>`).join('');
@@ -380,16 +388,9 @@ function vStoma() {
 }
 
 function vLabs() {
-  const m = M(), p = P();
-  const cats = ['肿瘤标志物', '血象', '生化', '电解质', '营养', '贝伐监测', '治疗毒性'];
-  const sections = cats.map(c => {
-    const ks = Object.keys(m).filter(k => m[k].cat === c);
-    if (!ks.length) return '';
-    const tag = c === '肿瘤标志物' ? '<span class="source-link">同一实验室可比</span>' : c === '治疗毒性' ? '<span class="source-link">只记原话，不分级</span>' : c === '电解质' ? '<span class="source-link">方案相关关注项</span>' : '';
-    return `<div class="section-title"><h2>${c}</h2>${tag}</div><div class="metric-grid">${ks.map(k => mcard(k, m[k])).join('')}</div>`;
-  }).join('');
+  const p = P();
   const img = p.resect ? row('<b>2026-10-09 · 胸腹盆增强 CT</b>', '肝转移灶 2 枚较前缩小；原文已归档。', pill('PR', 'green')) : row('<b>2026-10-12 · 胸腹盆 CT</b>', '术后改变，未见明确复发征象（影像原文为准）。', pill('已归档', 'green'));
-  return `<div class="page-enter">${pageHead(true)}${sections}
+  return `<div class="page-enter">${pageHead(true)}${metricSections()}
   <div class="section-title"><h2>影像评估</h2></div><div class="card">${img}</div>
   <p class="small-note">指标卡轻点翻面看参考区间与口径说明；分类记录（神经毒性、尿蛋白等）不翻面、不连线。</p></div>`;
 }
@@ -510,7 +511,91 @@ function vTrials() {
   <div class="card">${state.questions ? state.questions.map(q => row(`<b>${esc(q)}</b>`, '')).join('') : '<div class="empty" style="margin-top:0"><p>还没有添加问题。点任意试验的「加入入组问题」，把想问研究中心的问题先写在这里。</p></div>'}</div></div>`;
 }
 
-const VIEWS = { dashboard: vDashboard, subtype: vSubtype, treatment: vTreatment, stoma: vStoma, labs: vLabs, timeline: vTimeline, nutrition: vNutrition, mind: vMind, review: vReview, trials: vTrials };
+/* ---------------- 病情整理（records）：上传 → 解析 → 确认指标 → 入库 ---------------- */
+function flowSteps(cur) {
+  const steps = ['文件上传', '文件解析', '确认指标', '导入数据库'];
+  return `<div class="flow-steps">${steps.map((s) => `<span class="${s === cur ? 'on' : ''}">${s}</span>`).join('<span class="fs-arrow">→</span>')}</div>`;
+}
+function docsTable() {
+  const docs = DOCS[state.profile].filter((d) => !state.query || d.name.includes(state.query) || d.type.includes(state.query));
+  return `<div class="table-wrap"><table><thead><tr><th>材料名称</th><th>日期</th><th>类型</th><th>整理状态</th><th>操作</th></tr></thead><tbody>
+    ${docs.map((d) => `<tr><td><b>${esc(d.name)}</b><br><small>模拟资料 · 无真实文件</small></td><td>${esc(d.date)}</td><td>${esc(d.type)}</td>
+      <td>${pill(d.status, d.status === '已核对' ? 'green' : 'yellow')}</td>
+      <td><button class="source-link" data-action="source" data-source="${esc(d.name)}">原文</button> ${d.status === '待核对' ? `<button class="source-link" data-action="go-rec-sub" data-sub-i="1">看草稿</button>` : ''}</td></tr>`).join('')}
+  </tbody></table></div>${!docs.length ? '<div class="empty"><h3>没有找到这份材料</h3><p>试试「病理」「检验」或清空搜索。</p></div>' : ''}`;
+}
+function candidateRows() {
+  return CANDS[state.profile].map((c) => `<tr><td>${esc(c.name)}</td><td>${esc(c.value)}</td>
+    <td><button class="source-link" data-action="source" data-source="${esc(c.source)}">${esc(c.source.split('·').slice(-1)[0].trim())} ↗</button></td>
+    <td>${pill(c.status === 'accepted' ? '已核对' : c.status === 'needs_review' ? '需要确认' : '未核对', c.status === 'accepted' ? 'green' : 'yellow')}</td>
+    <td><button class="source-link" data-action="candidate" data-id="${esc(c.id)}">查看 / 更正</button></td></tr>`).join('');
+}
+function pathologyCard() {
+  const pa = P().pathology;
+  if (!pa) return '';
+  return `<div class="grid two">
+    <section class="card"><div class="card-head"><h2>${esc(pa.title)}</h2>${pill(pa.status, 'green')}</div>
+      <dl style="display:grid;grid-template-columns:104px 1fr;gap:8px 10px;font-size:12.5px;margin:0">
+        ${pa.rows.map((r) => `<dt style="color:var(--muted)">${esc(r[0])}</dt><dd style="margin:0">${esc(r[1])}</dd>`).join('')}
+      </dl></section>
+    <section class="card"><h2>这份档案还缺什么</h2><p>缺项表示尚未录入，不代表需要补做检查。</p>
+      ${pa.gaps.map((g) => row(`<b>${esc(g[0])}</b>`, esc(g[1]), pill('待补', 'yellow'))).join('')}
+      <button class="source-link" data-action="go-rec-sub" data-sub-i="1">继续整理材料 →</button></section>
+  </div>`;
+}
+function metricSections() {
+  const m = M();
+  return CAT_ORDER.map((c) => {
+    const ks = Object.keys(m).filter((k) => m[k].cat === c);
+    if (!ks.length) return '';
+    const tag = c === '肿瘤标志物' ? '<span class="source-link">同一实验室可比</span>' : c === '治疗毒性' ? '<span class="source-link">只记原话，不分级</span>' : c === '电解质' ? '<span class="source-link">方案相关关注项</span>' : '';
+    return `<div class="section-title"><h2>${c}</h2>${tag}</div><div class="metric-grid">${ks.map((k) => mcard(k, m[k])).join('')}</div>`;
+  }).join('');
+}
+function vRecords() {
+  const sub = SUBPAGES.records[state.sub.records || 0]; let body = '';
+  if (sub === '资料库') {
+    body = `<div class="toolbar"><input aria-label="搜索模拟材料" placeholder="搜索材料名称或类型" value="${esc(state.query)}" data-action="records-search">
+      <div class="actions">${pill('全部为模拟数据', 'violet')}<button class="primary" data-action="load-report">载入模拟报告</button><button class="soft" data-action="parse-fail">演示解析失败</button></div></div>
+      ${state.parsing ? '<div class="card" role="status">正在解析模拟材料（演示）：上传 → 解析 → 出候选…</div>' : ''}
+      ${state.parseError ? `<div class="notice warn">模拟解析失败。材料仍保留在资料库，不产生候选，可重试或手工核对。<button class="source-link" data-action="retry">重试</button></div>` : ''}
+      <div class="card" id="docs-table">${docsTable()}</div>
+      ${flowSteps('文件解析')}
+      <div class="help-box">演示链路：文件上传 → 解析出候选字段 → 在「整理草稿 / 核对」逐项确认 → 接受后才写入数据库。解析失败不产生候选，原件不删、随时可重试；「载入模拟报告」会完整走一遍成功链路。</div>`;
+  } else if (sub === '整理草稿 / 核对') {
+    const pending = CANDS[state.profile].filter((c) => c.status !== 'accepted').length;
+    body = `${flowSteps('确认指标')}
+      <div class="notice ${pending ? 'warn' : ''}">${pending ? `整理草稿 · 仍有 ${pending} 项未核对。可以先看轮廓，暂时不处理疑点。` : '整理草稿 · 这一档的候选都已核对。'}</div>
+      <div class="card"><div class="card-head"><h2>从材料里抽出来的候选字段</h2><span class="source-link">解析结果 · 候选不是结论</span></div>
+      <p>候选只表示"解析读到了这一项"；接受 = 你逐字核对过转录，不等于医学审核。接受后写入演示数据库（record + 事实表），原始候选不覆盖、留版本。</p>
+      <div class="table-wrap"><table><thead><tr><th>项目</th><th>材料中的内容</th><th>来源</th><th>状态</th><th>操作</th></tr></thead><tbody>${candidateRows()}</tbody></table></div>
+      <div class="actions" style="margin-top:12px"><button class="soft" data-action="go-rec-sub" data-sub-i="0">回到资料库</button><button class="primary" data-action="add-review-question">保留核实问题</button></div></div>
+      <div class="help-box">解析失败的文件不会出现在这里（不产生候选）；这里的每一项都能跳回原文出处。</div>`;
+  } else if (sub === '病情档案') {
+    body = `<div class="notice">不同标本、时间与来源的结果分别保留。不能用一份最新报告覆盖全部历史；未检测不等于阴性。</div>${pathologyCard()}`;
+  } else if (sub === '指标检测') {
+    body = `<div class="notice">以下为模拟数值。趋势只呈现记录，不代表疗效、复发或诊断判断；不同单位与方法需分开核对。</div>${metricSections()}
+      <div class="help-box">点卡片会在原位翻转看参考区间；分类记录（神经毒性、尿蛋白等）不翻面、不连线。</div>`;
+  } else {
+    const docs = DOCS[state.profile], cands = CANDS[state.profile];
+    const checked = cands.filter((c) => c.status === 'accepted').length;
+    body = `<div class="grid two">
+      <section class="card"><div class="card-head"><h2>就诊摘要预览</h2>${pill('模拟资料', 'violet')}</div>
+        <p>范围：${docs.length ? docs[0].date : '—'} 至 2026-10-18 · 本次只预览资料组织与分享选择。</p>
+        <div class="row"><div><b>病情与治疗材料</b><p>${docs.length} 份材料，保留各自日期与核对状态（待核对 ${docs.filter((d) => d.status !== '已核对').length} 份）。</p></div></div>
+        <div class="row"><div><b>候选字段</b><p>${cands.length} 项中已核对 ${checked} 项；未核对项在导出里保留"未核对"标记。</p></div></div>
+        <div class="row"><div><b>准备讨论的问题</b><p>${(state.questions || []).length} 个，可编辑与选择。</p></div></div>
+        <div class="notice">心理与「我的看法」默认不进入这份摘要。</div>
+        <button class="primary" data-action="export-review">编辑并导出问题清单</button></section>
+      <section class="card"><h2>分享之前，再看一眼</h2>
+        <p>未核对内容与来源状态在所有格式中都要保留。原型下载只包含主动选择的问题。</p>
+        <div class="notice plain" style="margin-top:14px">一期只做 Markdown 导出；PDF/DOCX 等格式需逐格式验收，未实现。</div>
+        <details><summary>导出会包含什么</summary><p>资料范围、来源版本、已核对与草稿区分、选入的问题；不含病历原文与私密记录。</p></details></section></div>`;
+  }
+  return `<div class="page-enter">${pageHead(true)}${body}</div>`;
+}
+
+const VIEWS = { dashboard: vDashboard, records: vRecords, subtype: vSubtype, treatment: vTreatment, stoma: vStoma, labs: vLabs, timeline: vTimeline, nutrition: vNutrition, mind: vMind, review: vReview, trials: vTrials };
 
 /* ---------------- agent dock（dsh 原生会话挂载位） ---------------- */
 const FORBIDDEN = ['建议治疗', '可能复发', '预后良好', '治愈率', '可以停药', '无需就医', '推荐方案', '生存率'];
@@ -584,12 +669,13 @@ function dlgProfiles() {
     '<button data-action="close">取消</button>');
 }
 function dlgSettings() {
-  openDialog('小畅宝', '设置', `<div class="cfg-tabs"><button aria-selected="true">资料目录</button><button aria-selected="false">文档解析</button><button aria-selected="false">临床数据库</button></div>
-  <div class="cfg-block"><h3>工作区资料目录</h3><div class="path-row"><code>~/Documents/ColopalWorkspace（演示值）</code><button class="soft">选择…</button></div>
+  openDialog('小畅宝', '设置', `<div class="cfg-tabs" role="tablist">
+  <button role="tab" aria-selected="true" data-action="cfg-tab" data-tab="ws">资料目录</button><button role="tab" aria-selected="false" data-action="cfg-tab" data-tab="parse">文档解析</button><button role="tab" aria-selected="false" data-action="cfg-tab" data-tab="kb">临床数据库</button></div>
+  <div class="cfg-block" style="margin-top:16px" data-tab="ws"><h3>工作区资料目录</h3><div class="path-row"><code>~/Documents/ColopalWorkspace（演示值）</code><button class="soft">选择…</button></div>
   <p class="small-note">患者数据只存入你明确选择的目录；工作台不把资料上传云端。</p></div>
-  <div class="cfg-block" style="margin-top:12px"><h3>文档解析（MinerU）</h3><div class="token-row"><code class="masked">MINERU_TOKEN 已配置（掩码：mr-****）</code></div>
+  <div class="cfg-block" style="margin-top:12px" data-tab="parse" hidden><h3>文档解析（MinerU）</h3><div class="token-row"><code class="masked">MINERU_TOKEN 已配置（掩码：mr-****）</code></div>
   <p class="small-note">Token 只存本机 .secrets/（mode 600）；解析结果永远是候选，核对后才入档。</p></div>
-  <div class="cfg-block" style="margin-top:12px"><h3>2026 临床数据库</h3><div class="path-row"><code>colorectal_cancer_trials_2026.sqlite · 480 条（演示）</code></div>
+  <div class="cfg-block" style="margin-top:12px" data-tab="kb" hidden><h3>2026 临床数据库</h3><div class="path-row"><code>colorectal_cancer_trials_2026.sqlite · 480 条（演示）</code></div>
   <p class="small-note">离线快照；中国注册库未采集，覆盖未知。</p></div>`, '<button class="primary" data-action="close">完成</button>');
 }
 function dlgAbout() {
@@ -658,6 +744,44 @@ document.addEventListener('click', (e) => {
     'go-timeline': () => { state.view = 'timeline'; location.hash = 'timeline'; render(); },
     'go-subtype': () => { state.view = 'subtype'; location.hash = 'subtype'; render(); },
     'go-trials': () => { state.view = 'trials'; location.hash = 'trials'; render(); },
+    'go-records': () => { state.view = 'records'; location.hash = 'records'; render(); },
+    'go-rec-sub': (el) => { state.view = 'records'; state.sub.records = +el.dataset.subI; location.hash = 'records'; render(); },
+    source: (el) => openDialog('小畅宝', '原文出处', `<p style="font-size:12.5px">${esc(el.dataset.source)}</p><p class="small-note">原件存放在你选的资料目录 imports/ 下（演示：不展示文件内容）。工作台不改动原文，也不替你解释它。</p>`, '<button class="primary" data-action="close">关闭</button>'),
+    'load-report': () => {
+      if (state.parsing) return;
+      if (state.loaded[state.profile]) { toast('模拟报告已载入，没有重复新增'); return; }
+      state.parsing = true; state.parseError = false; render();
+      setTimeout(() => {
+        DOCS[state.profile].push({ id: 'dx' + state.profile, name: '复查记录 · 新模拟报告', date: '2026-10-18', type: '其他', status: '待核对' });
+        CANDS[state.profile].push({ id: 'cx' + state.profile, name: '下次随访安排', value: '2027-01 前后（示例，以医生安排为准）', source: '复查记录 · 新模拟报告 · 第 1 页', status: 'candidate' });
+        state.loaded[state.profile] = true; state.parsing = false;
+        if (state.view === 'records') render();
+        toast('解析完成：候选已放入「整理草稿 / 核对」');
+      }, 900);
+    },
+    'parse-fail': () => { state.parseError = true; render(); },
+    retry: () => { state.parseError = false; toast('模拟重试完成；原件始终保留'); render(); },
+    candidate: (el) => {
+      const c = CANDS[state.profile].find((x) => x.id === el.dataset.id);
+      if (!c) return;
+      openDialog('小畅宝', '核对这一项内容',
+        `<div class="notice">核对表示"转录已逐字检查过"，不等于医学审核。</div>
+        <label style="display:block;margin-top:10px"><span class="form-label">${esc(c.name)}</span><input id="cand-input" style="width:100%" value="${esc(c.value)}" maxlength="160"></label>
+        <p class="small-note">来源：${esc(c.source)}。暂时不确定就保留待核对状态，不会丢。</p>`,
+        `<button class="soft" data-action="close">现在先不核对</button><button class="primary" data-action="cand-save" data-id="${esc(c.id)}">接受这条记录</button>`);
+    },
+    'cand-save': (el) => {
+      const c = CANDS[state.profile].find((x) => x.id === el.dataset.id);
+      const v = $('#cand-input') ? $('#cand-input').value.trim() : '';
+      if (c && v) { c.value = v; c.status = 'accepted'; }
+      closeDialog(); render(); toast('已接受：写入演示数据库（record + 事实表），候选留版本不覆盖');
+    },
+    'add-review-question': () => {
+      const q = state.profile === 'A' ? '请帮我核实：病理报告的脉管 / 神经侵犯结论，以及 Lynch 胚系检测是否出结果了。' : '请帮我核实：MDT-2 影像评估的肝转移灶大小与结论原文。';
+      state.questions = state.questions || [];
+      if (!state.questions.includes(q)) state.questions.push(q);
+      render(); toast('已加入复诊准备的问题清单');
+    },
     'add-diary': () => toast('原型内不落库；真实版在这里 30 秒记一条'),
     'add-meal': () => toast('原型内不落库；真实版在这里记一笔饮食'),
     'add-viewpoint': () => toast('感受会记为"一条信息"，标注不是医生结论'),
@@ -677,10 +801,20 @@ document.addEventListener('click', (e) => {
     'agent-demo': agentDemo
   };
   if (act === 'agent-size') { state.agentSize = e.target.closest('[data-action]').dataset.size; renderAgent(); return; }
+  if (act === 'cfg-tab') {
+    const el = e.target.closest('[data-action]');
+    document.querySelectorAll('.cfg-tabs [role=tab]').forEach((b) => b.setAttribute('aria-selected', String(b === el)));
+    document.querySelectorAll('.cfg-block[data-tab]').forEach((b) => { b.hidden = b.dataset.tab !== el.dataset.tab; });
+    return;
+  }
   if (map[act]) map[act](e.target.closest('[data-action]'));
 });
 document.addEventListener('input', (e) => {
   if (e.target.matches('[data-action="zoom"]')) { const sib = e.target.nextElementSibling; if (sib) sib.textContent = e.target.value + '%'; }
+  if (e.target.matches('[data-action="records-search"]')) {
+    state.query = e.target.value;
+    const wrap = $('#docs-table'); if (wrap) wrap.innerHTML = docsTable();
+  }
 });
 document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-action]');

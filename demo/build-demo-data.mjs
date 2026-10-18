@@ -125,6 +125,33 @@ const PROFILE_A = {
       ['2026-10-15', '水样 4 次/日，服药后好转', '周期2后自查']]) }],
   events: [
     { d: '2026-08-14', label: '手术+造口' }, { d: '2026-09-22', label: 'CAPEOX-1' }, { d: '2026-10-13', label: 'CAPEOX-2' }],
+  docs: [
+    { id: 'd1', name: '病理报告 · 乙状结肠', date: '2026-08-16', type: '病理', status: '已核对' },
+    { id: 'd2', name: '出院小结 · 术后', date: '2026-08-20', type: '住院', status: '已核对' },
+    { id: 'd3', name: '基因检测 · DPYD', date: '2026-09-15', type: '检验', status: '已核对' },
+    { id: 'd4', name: 'Lynch 胚系检测送检单', date: '2026-08-20', type: '其他', status: '待核对' },
+    { id: 'd5', name: '血常规 · 周期2后', date: '2026-10-16', type: '检验', status: '已核对' },
+    { id: 'd6', name: '胸腹盆 CT · 术前', date: '2026-08-05', type: '影像', status: '已核对' }],
+  candidates: [
+    { id: 'c1', name: '脉管侵犯', value: '未见明确脉管侵犯（L0）', source: '病理报告 · 乙状结肠 · 第 2 页', status: 'candidate' },
+    { id: 'c2', name: '神经侵犯', value: '未见明确神经侵犯（Pn0）', source: '病理报告 · 乙状结肠 · 第 2 页', status: 'candidate' },
+    { id: 'c3', name: 'Lynch 胚系检测结果', value: '报告未回（2026-08-20 送检）', source: 'Lynch 胚系检测送检单 · 第 1 页', status: 'needs_review' }],
+  pathology: {
+    title: '病理资料 · 乙状结肠',
+    status: '模拟转录 · 已核对',
+    rows: [
+      ['手术日期', '2026-08-14'],
+      ['部位', '乙状结肠'],
+      ['术式', '腹腔镜乙状结肠切除术 + 临时回肠造口（保护性）'],
+      ['分期', 'pT3N1bM0 · ⅢB'],
+      ['组织学', '腺癌'],
+      ['淋巴结', '1/15 阳性（N1b）'],
+      ['切缘', '阴性'],
+      ['MMR / MSI', 'dMMR / MSI-H（MLH1/PMS2 缺失）']],
+    gaps: [
+      ['脉管 / 神经侵犯', '病理报告候选待核对（整理草稿里确认）'],
+      ['Lynch 胚系检测', '报告未回；回来后与医生讨论家属筛查'],
+      ['RAS / BRAF', '未检测；Ⅲ期可在随访时问是否需要']]},
   nutritionNotes: [
     ['2026-10-15', '粥 + 蒸蛋，排泄 6–7 次偏水样；减少粗纤维后好转。'],
     ['2026-10-13', '化疗第 2 周期当天胃口差，下午加餐酸奶。'],
@@ -187,6 +214,32 @@ const PROFILE_B = {
       ['2026-09-20', '舌边小溃疡，吃酸的疼', '周期5后自查']]) }],
   events: [
     { d: '2026-07-01', label: '基线确诊' }, { d: '2026-07-10', label: 'FOLFIRI+贝伐-1' }, { d: '2026-08-30', label: 'MDT-1' }, { d: '2026-10-09', label: 'MDT-2' }],
+  docs: [
+    { id: 'd1', name: '病理报告 · 直肠', date: '2026-07-02', type: '病理', status: '已核对' },
+    { id: 'd2', name: 'NGS 报告', date: '2026-07-05', type: '检验', status: '已核对' },
+    { id: 'd3', name: '影像评估 · MDT-2', date: '2026-10-09', type: '影像', status: '待核对' },
+    { id: 'd4', name: '出院小结 · 转化治疗', date: '2026-09-20', type: '住院', status: '已核对' },
+    { id: 'd5', name: '血压 / 尿蛋白记录 · 周期6', date: '2026-10-13', type: '检验', status: '已核对' }],
+  candidates: [
+    { id: 'c1', name: '肝转移灶 S4 大小', value: '18 mm（较基线缩小）', source: '影像评估 · MDT-2 · 第 1 页', status: 'candidate' },
+    { id: 'c2', name: '肝转移灶 S7 大小', value: '12 mm（较基线缩小）', source: '影像评估 · MDT-2 · 第 1 页', status: 'candidate' },
+    { id: 'c3', name: '影像评估结论', value: 'PR，继续转化 2 周期后复评', source: 'MDT-2 记录 · 第 2 页', status: 'needs_review' }],
+  pathology: {
+    title: '病理与分子资料 · 直肠',
+    status: '模拟转录 · 已核对',
+    rows: [
+      ['确诊日期', '2026-07-01'],
+      ['部位', '直肠（距肛 6 cm）'],
+      ['组织学', '腺癌'],
+      ['分期', 'cT3N2M1（肝）· Ⅳ'],
+      ['MMR / MSI', 'pMMR / MSS'],
+      ['RAS', 'KRAS G12D 突变'],
+      ['BRAF', '野生型'],
+      ['HER2', '阴性（IHC 1+）']],
+    gaps: [
+      ['影像评估 MDT-2', '候选待核对：肝转移灶大小与结论（整理草稿里确认）'],
+      ['可切除性', '待 10-27 复评；外科原话已存档'],
+      ['PIK3CA', '未检测；只记录不推荐']]},
   nutritionNotes: [
     ['2026-10-09', 'MDT-2 当天食欲一般；加餐 2 次。'],
     ['2026-09-28', '食欲恢复，正餐正常，体重稳住。'],
@@ -200,7 +253,8 @@ function assemble(P, sex, prefixDateBase) {
   const metrics = [...P.extraMetrics, ...commonNumeric(sex)].map((m) => ({ ...m, color: KEY_COLOR[m.key] || m.color }));
   return { ...P.meta, path: P.path, molecular: P.molecular, lynch: P.lynch, lines: P.lines, cycles: P.cycles,
     rhythm: P.rhythm, resect: P.resect, stoma: P.stoma, lars: P.lars, viewpoints: P.viewpoints,
-    metrics, events: P.events, nutritionNotes: P.nutritionNotes, activity: P.activity, familyTalk: P.familyTalk };
+    metrics, events: P.events, docs: P.docs, candidates: P.candidates, pathology: P.pathology,
+    nutritionNotes: P.nutritionNotes, activity: P.activity, familyTalk: P.familyTalk };
 }
 const DATA = {
   profiles: { A: assemble(PROFILE_A, '男'), B: assemble(PROFILE_B, '女') },
@@ -225,6 +279,7 @@ DROP TABLE IF EXISTS metric_points; DROP TABLE IF EXISTS metrics; DROP TABLE IF 
 DROP TABLE IF EXISTS events; DROP TABLE IF EXISTS rhythm; DROP TABLE IF EXISTS cycles; DROP TABLE IF EXISTS treatment_lines;
 DROP TABLE IF EXISTS stoma_diary; DROP TABLE IF EXISTS lars; DROP TABLE IF EXISTS resect_rows; DROP TABLE IF EXISTS lynch_rows;
 DROP TABLE IF EXISTS viewpoints; DROP TABLE IF EXISTS nutrition_notes; DROP TABLE IF EXISTS trials; DROP TABLE IF EXISTS subjects; DROP TABLE IF EXISTS demo_meta;
+DROP TABLE IF EXISTS documents; DROP TABLE IF EXISTS candidate_fields; DROP TABLE IF EXISTS pathology_rows;
 CREATE TABLE subjects (profile_key TEXT PRIMARY KEY, name TEXT, sex TEXT, age INTEGER, meta TEXT, headline TEXT, stage TEXT, mindset TEXT, dash_keys TEXT, path TEXT);
 CREATE TABLE metrics (profile_key TEXT, key TEXT, name TEXT, unit TEXT, cat TEXT, color TEXT, dec INTEGER, kind TEXT, band_low REAL, band_high REAL, note TEXT, PRIMARY KEY(profile_key, key));
 CREATE TABLE metric_points (profile_key TEXT, metric_key TEXT, d TEXT, v_num REAL, v_text TEXT, src TEXT, ord INTEGER, PRIMARY KEY(profile_key, metric_key, d, ord));
@@ -241,6 +296,9 @@ CREATE TABLE viewpoints (profile_key TEXT, d TEXT, mood TEXT, text TEXT, ord INT
 CREATE TABLE nutrition_notes (profile_key TEXT, d TEXT, text TEXT, ord INTEGER);
 CREATE TABLE trials (nct_id TEXT PRIMARY KEY, title TEXT, phase TEXT, status TEXT, sponsor TEXT, url TEXT);
 CREATE TABLE demo_meta (k TEXT PRIMARY KEY, v TEXT);
+CREATE TABLE documents (profile_key TEXT, id TEXT, name TEXT, date TEXT, type TEXT, status TEXT, ord INTEGER, PRIMARY KEY(profile_key, id));
+CREATE TABLE candidate_fields (profile_key TEXT, id TEXT, name TEXT, value TEXT, source TEXT, status TEXT, ord INTEGER, PRIMARY KEY(profile_key, id));
+CREATE TABLE pathology_rows (profile_key TEXT, kind TEXT, a TEXT, b TEXT, ord INTEGER);
 CREATE INDEX idx_points ON metric_points(profile_key, metric_key);
 `);
 for (const [k, p] of Object.entries(DATA.profiles)) {
@@ -260,6 +318,10 @@ for (const [k, p] of Object.entries(DATA.profiles)) {
   if (p.lynch) p.lynch.rows.forEach((r, i) => db.prepare('INSERT INTO lynch_rows VALUES (?,?,?,?,?)').run(k, r[0], r[1], r[2], i));
   p.viewpoints.forEach((v, i) => db.prepare('INSERT INTO viewpoints VALUES (?,?,?,?,?)').run(k, v[0], v[1], v[2], i));
   p.nutritionNotes.forEach((n, i) => db.prepare('INSERT INTO nutrition_notes VALUES (?,?,?,?)').run(k, n[0], n[1], i));
+  p.docs.forEach((d, i) => db.prepare('INSERT INTO documents VALUES (?,?,?,?,?,?,?)').run(k, d.id, d.name, d.date, d.type, d.status, i));
+  p.candidates.forEach((c, i) => db.prepare('INSERT INTO candidate_fields VALUES (?,?,?,?,?,?,?)').run(k, c.id, c.name, c.value, c.source, c.status, i));
+  p.pathology.rows.forEach((r, i) => db.prepare('INSERT INTO pathology_rows VALUES (?,?,?,?,?)').run(k, 'row', r[0], r[1], i));
+  p.pathology.gaps.forEach((r, i) => db.prepare('INSERT INTO pathology_rows VALUES (?,?,?,?,?)').run(k, 'gap', r[0], r[1], i));
 }
 DATA.trials.forEach(t => db.prepare('INSERT INTO trials VALUES (?,?,?,?,?,?)').run(t.id, t.title, t.phase, t.status, t.sponsor, t.url));
 [['disclaimer', '全部患者数据为虚构模拟，仅供原型演示；trials 表为真实登记摘录，状态未核实'],
