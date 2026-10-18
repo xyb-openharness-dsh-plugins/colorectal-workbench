@@ -31,3 +31,12 @@
 - 覆盖：v0.1 全部 + 指标回填（MONITORING-METRICS A–F 六类落到页面：安全监测四卡、监测节奏卡、Lynch 位、贝伐血压/蛋白尿序列、ctDNA/PET 空态）+ 数值滚动动画（尊重 prefers-reduced-motion）+ 指标卡翻面（仅数值型）+ AI 原生会话挂载位（右栏、可隐藏、按钮激活、prompt 预览、模拟回复红线自检）
 - 校验：标签配平通过；正文文案红线零命中（JS 自检词表除外）；脚本语法解析通过
 - 状态：**未审** —— G2 审定对象为 v2
+
+# HTML demo v0.3 登记（2026-10-18 · 视觉体系重构）
+
+- 目录：`prototypes/v0.2/`（index.html + style.css + app.js 多文件；v1/v2 单文件保留作轨迹）
+- 缘由：**用户反馈 v0.2 视觉风格不理想，指定以淋巴瘤原型（小铃铛 LymBell）为家族视觉基准**
+- 实现：以淋巴瘤 style.css 为基底做「紫→Colopal Awareness 深蓝」全量色彩映射（43 组色值，含硬编码色与 rgba），保留其版式基因：纸色底+白卡片+14px 圆角+柔和阴影、侧栏档案切换、顶栏状态 chips、3D 翻转指标卡、SVG 折线（参考带+治疗节点+tooltip+绘制动画）、大字模式、reduced-motion 适配、页面进场动画
+- 内容保留 v0.2 全部范围：监测节奏卡（NCCN/CSCO 标注）、Lynch 位、贝伐血压/蛋白尿、ctDNA/PET 空态、LARS 三档、三键日记、可切除性评估、真实登记试验 10 条（NCT 号可溯源、标"状态未核实"）、AI 原生会话挂载位（右侧 dock、三档宽度、prompt 预览、红线自检）
+- 校验：app.js 语法通过（46.9KB）；index.html 标签配平；style.css 420 对括号；正文红线零命中（FORBIDDEN 自检词表除外）
+- 状态：**未审** —— G2 审定对象更新为 prototypes/v0.2/
