@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>小畅宝 Colopal · 结直肠癌工作台 v0.1（演示）</title>
+<!--
+  Colopal 结直肠癌工作台 · HTML 交互 demo v0.1（2026-10-18）
+  · 全部数据为演示用模拟数据，不是真实病例；页面各处已标注。
+  · 对应 SPEC v0.1（docs/SPEC.md）A1–A18；本 demo 是 G2 审定对象。
+  · 风格基因：主=瑞士平面（清晰理性），辅=治愈留白；强调色=结直肠癌 Awareness 深蓝 #1B4F8A。
+-->
+<style>
+:root{
+  --bg:#f6f8fa; --surface:#ffffff; --ink:#1c2530; --ink2:#4a5568; --ink3:#98a3b3;
+  --line:#e4e9ef; --accent:#1B4F8A; --accent-soft:#e8f0f8; --accent-ink:#12395f;
+  --warn-soft:#faf3e4; --warn-ink:#8a6d1f; --ok-soft:#e9f4ec; --ok-ink:#2e6b3f;
+  --priv-soft:#f3eaf6; --priv-ink:#6b3f80;
+  --radius:4px; --font:'Helvetica Neue','PingFang SC','Noto Sans SC',sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--ink);font:15px/1.6 var(--font);font-variant-numeric:tabular-nums}
+button{font:inherit;cursor:pointer;border:1px solid var(--line);background:var(--surface);color:var(--ink2);border-radius:var(--radius);padding:6px 14px;min-height:36px}
+button:hover{border-color:var(--accent);color:var(--accent-ink)}
+.btn-primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn-primary:hover{background:var(--accent-ink);color:#fff}
+.chip{display:inline-block;font-size:12px;padding:2px 10px;border-radius:999px;border:1px solid var(--line);color:var(--ink2);background:var(--surface)}
+.chip-accent{background:var(--accent-soft);border-color:transparent;color:var(--accent-ink)}
+.chip-warn{background:var(--warn-soft);border-color:transparent;color:var(--warn-ink)}
+.chip-ok{background:var(--ok-soft);border-color:transparent;color:var(--ok-ink)}
+.chip-priv{background:var(--priv-soft);border-color:transparent;color:var(--priv-ink)}
+.chip-mute{color:var(--ink3)}
+
+/* 布局 */
+.topbar{display:flex;align-items:center;gap:14px;padding:10px 22px;background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;flex-wrap:wrap}
+.brand{display:flex;align-items:center;gap:10px}
+.brand-mark{width:34px;height:34px;border-radius:var(--radius);background:var(--accent);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:15px;letter-spacing:.5px}
+.brand-name{font-weight:700;font-size:16px}
+.brand-sub{font-size:11px;color:var(--ink3)}
+.spacer{flex:1}
+.persona{display:flex;gap:6px;align-items:center}
+.persona .chip{cursor:pointer}
+.persona .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.gear{width:36px}
+.shell{display:flex;min-height:calc(100vh - 55px)}
+nav.side{width:216px;flex:0 0 auto;background:var(--surface);border-right:1px solid var(--line);padding:14px 10px;display:flex;flex-direction:column;gap:2px}
+nav.side button{border:0;background:none;text-align:left;padding:9px 12px;border-radius:var(--radius);color:var(--ink2);display:flex;gap:9px;align-items:center}
+nav.side button .dot{width:6px;height:6px;border-radius:50%;background:var(--line);flex:0 0 auto}
+nav.side button.active{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+nav.side button.active .dot{background:var(--accent)}
+nav.side .nav-note{font-size:11px;color:var(--ink3);padding:10px 12px;margin-top:auto}
+main{flex:1;min-width:0;padding:22px 26px 60px}
+.view{display:none;max-width:1080px}
+.view.active{display:block}
+.page-head{margin-bottom:18px}
+.page-head h1{font-size:22px;font-weight:700}
+.page-head p{color:var(--ink2);font-size:13.5px;margin-top:4px}
+.subnav{display:flex;gap:6px;flex-wrap:wrap;margin:14px 0 18px}
+.subnav .chip{cursor:pointer}
+.subnav .chip.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:18px 20px;margin-bottom:16px}
+.card h2{font-size:15px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.card h2 .chip{font-weight:400}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th{text-align:left;font-weight:600;color:var(--ink3);font-size:12px;border-bottom:1px solid var(--line);padding:7px 10px;white-space:nowrap}
+td{border-bottom:1px solid var(--line);padding:8px 10px;vertical-align:top}
+tr:last-child td{border-bottom:0}
+.mono{font-family:ui-monospace,Menlo,monospace;font-size:12.5px}
+.muted{color:var(--ink3);font-size:12.5px}
+.kv{display:grid;grid-template-columns:130px 1fr;gap:6px 14px;font-size:13.5px}
+.kv dt{color:var(--ink3)}
+.demo-banner{background:var(--warn-soft);color:var(--warn-ink);font-size:12.5px;padding:7px 22px;border-bottom:1px solid var(--line)}
+.trend{width:100%;height:auto;display:block}
+.notice{border-left:3px solid var(--accent);background:var(--accent-soft);padding:10px 14px;border-radius:0 var(--radius) var(--radius) 0;font-size:13px;color:var(--accent-ink);margin:10px 0}
+.notice-gray{border-left:3px solid var(--line);background:var(--bg);padding:10px 14px;border-radius:0 var(--radius) var(--radius) 0;font-size:12.5px;color:var(--ink2);margin:10px 0}
+.private-tag{display:inline-flex;align-items:center;gap:5px}
+.big-num{font-size:30px;font-weight:700;color:var(--accent-ink);line-height:1.2}
+.big-label{font-size:12px;color:var(--ink3)}
+textarea,input[type=text]{width:100%;border:1px solid var(--line);border-radius:var(--radius);padding:8px 10px;font:inherit;color:var(--ink)}
+.export-preview{background:#fafbfc;border:1px dashed var(--line);border-radius:var(--radius);padding:14px;white-space:pre-wrap;font-family:ui-monospace,Menlo,monospace;font-size:12px;color:var(--ink2);max-height:320px;overflow:auto}
+footer{padding:18px 26px;border-top:1px solid var(--line);color:var(--ink3);font-size:12px;background:var(--surface)}
+
+/* ===== AI 对话面板：宿主原生会话的挂载位，不是自研聊天 ===== */
+.btn-ai{display:inline-flex;align-items:center;gap:8px}
+.btn-ai .sdot{width:8px;height:8px;border-radius:50%;background:var(--line);flex:0 0 auto}
+.btn-ai[aria-expanded="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent-ink)}
+.sdot.tone-ok{background:#3f8f5c}
+.sdot.tone-neutral{background:#98a3b3}
+.sdot.tone-pending{background:#98a3b3}
+.sdot.tone-warning{background:#c98a3c}
+.sdot.tone-error{background:#b4553f}
+aside.agent{display:none;width:400px;flex:0 0 400px;flex-direction:column;background:var(--surface);border-left:1px solid var(--line);min-width:0;min-height:0}
+aside.agent.open{display:flex}
+.agent-head{display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.agent-head strong{font-size:14px}
+.agent-w{margin-left:auto;display:flex;gap:2px}
+.agent-w button,.icon-btn{min-height:28px;padding:2px 8px;font-size:12px}
+.agent-body{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:12px}
+.agent-foot{border-top:1px solid var(--line);padding:10px 14px;background:#fbfcfd}
+.slot{border:1px dashed var(--line);border-radius:var(--radius);padding:12px;background:#fbfcfd}
+.msg{border:1px solid var(--line);border-radius:var(--radius);padding:10px 12px;font-size:13px;background:var(--surface)}
+.msg .role{font-size:11px;color:var(--ink3);margin-bottom:5px}
+.msg.me{background:var(--accent-soft);border-color:transparent}
+.msg pre{white-space:pre-wrap;font:inherit;margin:0;line-height:1.65}
+.msg .hits{margin-top:8px;font-size:11.5px;color:var(--warn-ink)}
+.ctxline{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.fold summary{cursor:pointer;font-size:12.5px;color:var(--ink2);user-select:none}
+.fold pre{white-space:pre-wrap;font:12px/1.6 ui-monospace,Menlo,monospace;background:#fafbfc;border:1px solid var(--line);border-radius:var(--radius);padding:10px;max-height:200px;overflow:auto;color:var(--ink2);margin-top:8px}
+.scrim{display:none;position:fixed;inset:0;background:rgba(28,37,48,.35);z-index:55}
+.scrim.show{display:block}
+
+/* 设置弹窗 */
+.mask{display:none;position:fixed;inset:0;background:rgba(28,37,48,.45);z-index:50;align-items:flex-start;justify-content:center;padding:60px 16px}
+.mask.open{display:flex}
+.modal{background:var(--surface);border-radius:6px;max-width:620px;width:100%;padding:22px 24px;max-height:80vh;overflow:auto}
+.modal h2{font-size:17px;margin-bottom:14px}
+.modal .row{margin-bottom:14px}
+.modal .row label{display:block;font-size:13px;font-weight:600;margin-bottom:5px}
+@media (max-width:900px){
+  .shell{flex-direction:column}
+  nav.side{width:100%;flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line);padding:8px}
+  nav.side button{white-space:nowrap}
+  nav.side .nav-note{display:none}
+  .grid2,.grid3{grid-template-columns:1fr}
+}
+@media print{ nav.side,.topbar,.demo-banner{display:none} }
+</style>
+</head>
+<body>
+
+<div class="demo-banner">演示数据 · 本页所有人物、数值、报告均为虚构模拟，用于交互确认，不是真实病例，也不是医疗建议。</div>
+
+<header class="topbar">
+  <div class="brand">
+    <div class="brand-mark">畅</div>
+    <div>
+      <div class="brand-name">小畅宝 Colopal</div>
+      <div class="brand-sub">结直肠癌工作台 · 文字标识占位（Logo 位预留）</div>
+    </div>
+  </div>
+  <span class="chip chip-mute mono">v0.1.0-demo</span>
+  <div class="spacer"></div>
+  <div class="persona" title="切换演示画像">
+    <span class="muted">画像：</span>
+    <button class="chip active" id="pA" onclick="setPersona('A')">A · 直肠癌术后 · 临时造口</button>
+    <button class="chip" id="pB" onclick="setPersona('B')">B · 结肠癌肝转移 · 无造口</button>
+  </div>
+  <button class="gear" onclick="openSettings()" title="设置">⚙ 设置</button>
+</header>
+
+<div class="shell">
+<nav class="side" id="nav">
+  <button class="active" data-view="dashboard"><span class="dot"></span>看板</button>
+  <button data-view="typing"><span class="dot"></span>我的分型</button>
+  <button data-view="treatment"><span class="dot"></span>治疗历程</button>
+  <button data-view="gut"><span class="dot"></span>肠道功能与造口</button>
+  <button data-view="labs"><span class="dot"></span>检查与指标</button>
+  <button data-view="chart"><span class="dot"></span>病情一图秀</button>
+  <button data-view="nutrition"><span class="dot"></span>营养支持</button>
+  <button data-view="mood"><span class="dot"></span>心理支持</button>
+  <button data-view="visit"><span class="dot"></span>复诊准备</button>
+  <button data-view="trials"><span class="dot"></span>临床研究</button>
+  <div class="nav-note">设置在右上角齿轮，不占一级导航（SPEC §4）。</div>
+</nav>
+
+<main id="main"><!-- JS 渲染 --></main>
+</div>
+
+<footer>
+  小畅宝 Colopal v0.1.0-demo · 本工作台只做资料整理与呈现，不做诊断、疗效判读与处置建议；诊断、分期、还纳评估与治疗决策以医生为准。<br>
+  HTML 交互 demo（G2 审定对象）· 演示数据非真实病例 · 对应 SPEC v0.1 A1–A18 · 2026-10-18
+</footer>
+
+<!-- 设置弹窗（SPEC：设置页一期可审阅功能） -->
+<div class="mask" id="mask" onclick="if(event.target===this)closeSettings()">
+  <div class="modal" role="dialog" aria-label="设置">
+    <h2>设置</h2>
+    <div class="row">
+      <label>患者资料目录</label>
+      <input type="text" value="/Users/demo/Documents/colopal-workspace" readonly>
+      <div class="muted" style="margin-top:5px">更换目录时旧资料保留在原目录，不会被清空或自动迁移；主目录 / 根目录 / 桌面根不可选（会给出可读原因）。</div>
+    </div>
+    <div class="row">
+      <label>文档解析</label>
+      <div>模式：本地候选提取（演示） · 云端解析：<span class="chip chip-mute">未启用</span></div>
+      <div class="muted" style="margin-top:5px">云端模式会逐文件明示"发送什么、发给谁、为什么"，每个文件发送前单独确认；保存设置不等于逐次授权。</div>
+    </div>
+    <div class="row">
+      <label>解析服务凭据</label>
+      <div class="mono">来源：环境变量 MINERU_TOKEN · 掩码 ****abcd</div>
+      <div class="muted" style="margin-top:5px">完整凭据不显示、不落盘到患者目录；可随时清除改用共享凭据。</div>
+    </div>
+    <div class="row">
+      <label>临床研究数据库</label>
+      <div>来源：本地资料包（2026 结直肠癌登记） · 状态：<span class="chip chip-ok">已加载</span> <span class="chip chip-mute mono">版本 2026-10-18</span></div>
+      <div class="muted" style="margin-top:5px">登记数据不等于入组资格；状态需回源核实。</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">
+      <button onclick="closeSettings()">取消</button>
+      <button class="btn-primary" onclick="alert('演示环境：设置不真正保存。')">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ============ 演示数据（全部虚构） ============ */
+const P = {
+A: {
+  name:'李先生 · 58岁 · 直肠癌', headline:'术后辅助化疗第 3 程（共 6 程）· 临时回肠造口在位 · 下次复诊 11-04',
+  typing:{
+    stage:'cT3bN1bM0 · ⅢB 期（TNM 第 8 版，临床）', side:'直肠（低位，腹膜反折以下）', pathology:'中分化腺癌',
+    confirmBy:'外院病理会诊 2026-07-28（医生给出）',
+    molecular:[
+      {k:'MMR（免疫组化）', v:'dMMR（MLH1− / PMS2− / MSH2+ / MSH6+）', st:'检出', d:'2026-07-21', src:'病理报告 p.3'},
+      {k:'MSI（PCR）', v:'MSI-H（MSI 稳定性：高）', st:'检出', d:'2026-07-21', src:'病理报告 p.3'},
+      {k:'RAS（KRAS/NRAS）', v:'野生型', st:'野生型', d:'2026-07-21', src:'NGS 报告 p.2'},
+      {k:'BRAF V600E', v:'野生型', st:'野生型', d:'2026-07-21', src:'NGS 报告 p.2'},
+      {k:'HER2', v:'—', st:'未检测', d:'—', src:'—'},
+    ],
+    consult:[{d:'2026-07-28', org:'省肿瘤医院病理会诊', res:'结论一致', note:'切片复核与原报告一致'}]
+  },
+  lines:[
+    {name:'术前（新辅助）', plan:'长程同步放化疗（25 次 IMRT + 卡培他滨）', period:'2026-06-02 – 2026-07-07', status:'已完成',
+     cycles:[['1–25 次放疗','计划 06-02–07-07','实际 06-02–07-07','按计划']],
+     note:'治疗结束评估：肿瘤缩小（影像评估原文见治疗历程）'},
+    {name:'术后（辅助）', plan:'CAPOX（奥沙利铂 + 卡培他滨）', period:'2026-09-28 起', status:'进行中 · 第 3/6 程',
+     cycles:[['第1程','计划 09-28','实际 09-28','按计划'],['第2程','计划 10-19','实际 10-21','延迟 2 天：外周神经毒性（手指麻木，接触冷物加重）'],['第3程','计划 11-09','实际 —','—']],
+     note:'延迟/减量均记录原因（验收 A11）'}
+  ],
+  cea:[['2026-06-02',34.2],['2026-07-07',12.8],['2026-09-01',6.1],['2026-09-28',4.3],['2026-10-15',3.9]],
+  stoma:{type:'回肠袢式造口', pos:'右下腹', date:'2026-09-03', dur:'临时（计划还纳）',
+    reversals:[{d:'2026-10-12', who:'手术团队门诊', text:'吻合口愈合良好，影像未见异常；预计 12 月安排还纳，具体时间等排期。'}],
+    diary:[
+      {d:'10-15', kind:'用品', text:'一件式底盘，更换顺利，粘贴牢固', tag:'正常'},
+      {d:'10-15', kind:'皮肤', text:'周围皮肤无红损', tag:'正常'},
+      {d:'10-16', kind:'排泄', text:'水样便 4 次，量中等', tag:'记录'},
+      {d:'10-17', kind:'皮肤', text:'底盘边缘轻微发红，已按医生教的护理方法处理', tag:'观察'},
+      {d:'10-17', kind:'用品', text:'更换底盘一枚', tag:'正常'},
+    ],
+    threshold:'（以下为医生原话记录，不是系统判断）——"发烧超过 38.5℃、造口停止排气排便超过 1 天、周围皮肤破溃扩大，就联系团队。"（2026-09-06 出院医嘱）'},
+  lars:null,
+  colon:null,
+  labs:{tumor:[['2026-06-02',34.2,'↑'],['2026-07-07',12.8,'↑'],['2026-09-01',6.1,'↑'],['2026-09-28',4.3,'↑'],['2026-10-15',3.9,'↑']],
+        cbc:[['2026-10-15','WBC 3.2 ×10⁹/L（偏低）'],['2026-10-15','中性粒细胞 1.6 ×10⁹/L'],['2026-10-15','Hb 112 g/L'],['2026-10-15','PLT 210 ×10⁹/L']],
+        imaging:[['2026-08-26','盆腔增强 MRI','吻合口区域未见明确残留灶（原文见报告）'],['2026-06-02','盆腔 MRI（基线）','直肠肿物，距肛缘 4cm（原文见报告）']]},
+  nutrition:[['2026-06-02',68.5],['2026-07-07',67.1],['2026-09-03',65.8],['2026-10-15',66.3]],
+  mood:[
+    {d:'2026-10-16', text:'换造口袋还是紧张，怕弄脏衣服，出门前要检查好几遍。', tag:'不是医生结论', priv:false},
+    {d:'2026-10-10', text:'孩子还不知道造口的事，想着还纳以后再慢慢说。', tag:'不是医生结论', priv:true},
+  ],
+  visit:{next:'2026-11-04（复诊：血常规 + CEA + 门诊）', colonoscopy:'术后 1 年内遵医嘱安排（上次：2025-11）',
+    questions:['第 3 程手指麻木加重，是否需要调整后续疗程？','造口还纳排期大概什么时候？还纳前需要做什么检查？','下次肠镜什么时候做？'],
+    viewpoints:['我觉得手指麻木比上次明显了，想先说说再决定要不要减量。']},
+  trialRows:[
+    ['模拟行 1','一项 MSI-H/dMMR 结直肠癌的免疫治疗研究','Ⅲ 期','状态未核实','模拟数据'],
+    ['模拟行 2','转移性结直肠癌的新型靶向联合研究','Ⅱ 期','状态未核实','模拟数据'],
+    ['模拟行 3','直肠癌新辅助放化疗后等待时间研究','回顾性','状态未核实','模拟数据'],
+  ]
+},
+B: {
+  name:'王女士 · 47岁 · 乙状结肠癌伴肝转移', headline:'转化治疗中（第 4 程，共计划 6 程）· 无造口 · 下次评估 11-20',
+  typing:{
+    stage:'cT4aN0M1c（肝）· Ⅳ 期（TNM 第 8 版，临床）', side:'乙状结肠（左半）', pathology:'中分化腺癌',
+    confirmBy:'本院病理 2026-08-02（医生给出）',
+    molecular:[
+      {k:'MMR（免疫组化）', v:'pMMR（四蛋白均阳性）', st:'检出', d:'2026-08-02', src:'病理报告 p.2'},
+      {k:'MSI（PCR）', v:'MSS（微卫星稳定）', st:'检出', d:'2026-08-02', src:'病理报告 p.2'},
+      {k:'RAS（KRAS/NRAS）', v:'KRAS G12D 突变', st:'检出', d:'2026-08-02', src:'NGS 报告 p.1'},
+      {k:'BRAF V600E', v:'—', st:'待出', d:'2026-10-20 取样', src:'NGS 报告（未回）'},
+      {k:'HER2', v:'—', st:'未检测', d:'—', src:'—'},
+    ],
+    consult:[{d:'2026-08-20', org:'肝胆外科 + 肿瘤内科 MDT', res:'改变了治疗安排', note:'两处肝转移灶经评估纳入"潜在可切除"，先行全身治疗（MDT 原话见治疗历程）'}]
+  },
+  lines:[
+    {name:'转化治疗（一线）', plan:'FOLFOXIRI + 贝伐珠单抗', period:'2026-08-25 起', status:'进行中 · 第 4/6 程',
+     cycles:[['第1程','计划 08-25','实际 08-25','按计划'],['第2程','计划 09-15','实际 09-15','按计划'],['第3程','计划 10-06','实际 10-09','延迟 3 天：口腔黏膜炎'],['第4程','计划 10-27','实际 10-27','按计划'],['第5程','计划 11-17','实际 —','—']],
+     note:'转化目标与可切除性以 MDT 原话为准（见下方记录）'}
+  ],
+  cea:[['2026-08-02',58.6],['2026-09-12',31.4],['2026-10-03',18.2],['2026-10-24',12.7]],
+  stoma:null,
+  lars:{
+    records:[{d:'2026-09-30', score:21, raw:'LARS 问卷 21 分（原文照录）'},{d:'2026-10-28', score:17, raw:'LARS 问卷 17 分（原文照录）'}],
+    tag:'自查记录，不是医生评估；分数只留档，不给严重程度结论。'
+  },
+  colon:{nodes:[{d:'2026-06-14', text:'肠镜复查（已过期 —— 可和医生确认下次时间）', expired:true},{d:'2026-08-02', text:'肠镜（初诊检查）：乙状结肠距肛门 25cm 见溃疡型肿物；息肉 2 枚已切除（原文见报告）', expired:false}],
+    polyps:'息肉史：2 枚（增生性），已切除（2026-08-02）'},
+  labs:{tumor:[['2026-08-02',58.6,'↑'],['2026-09-12',31.4,'↑'],['2026-10-03',18.2,'↑'],['2026-10-24',12.7,'↑']],
+        cbc:[['2026-10-24','WBC 4.1 ×10⁹/L'],['2026-10-24','中性粒细胞 2.2 ×10⁹/L'],['2026-10-24','Hb 98 g/L（偏低）'],['2026-10-24','PLT 185 ×10⁹/L']],
+        imaging:[['2026-10-10','上腹增强 MRI','肝 S6/S7 两处病灶，较大者约 1.8cm（此前 3.2cm）（原文见报告）'],['2026-08-02','上腹增强 MRI（基线）','肝 S6/S7 两处转移灶，较大者约 3.2cm（原文见报告）']]},
+  nutrition:[['2026-08-02',54.0],['2026-09-12',52.6],['2026-10-24',51.9]],
+  mood:[
+    {d:'2026-10-25', text:'第 4 程打完胃口一般，但看到肝上病灶变小，心里踏实了一点。', tag:'不是医生结论', priv:false},
+  ],
+  visit:{next:'2026-11-17（第 5 程）· 11-20（影像评估）', colonoscopy:'肝胆外科与消化科随访安排遵医嘱',
+    questions:['两处肝病灶什么时候安排手术评估？','BRAF 结果出了没有？对方案有没有影响？','Hb 一直偏低，和化疗关系需要处理吗？'],
+    viewpoints:['我担心化疗反应越来越重，想问问能不能在保证效果的前提下调整。']},
+  trialRows:[
+    ['模拟行 1','RAS 突变转移性结直肠癌的联合治疗研究','Ⅲ 期','状态未核实','模拟数据'],
+    ['模拟行 2','结直肠癌肝转移围手术期治疗研究','Ⅱ/Ⅲ 期','状态未核实','模拟数据'],
+    ['模拟行 3','结直肠癌患者症状管理与支持研究','观察性','状态未核实','模拟数据'],
+  ]
+}
+};
+let cur = 'A';
+
+/* ============ 视图渲染 ============ */
+const el = id => document.getElementById(id);
+function setPersona(p){
+  cur = p;
+  el('pA').classList.toggle('active', p==='A');
+  el('pB').classList.toggle('active', p==='B');
+  render(curView);
+}
+function setView(v){
+  curView = v;
+  document.querySelectorAll('nav.side button').forEach(b=>b.classList.toggle('active', b.dataset.view===v));
+  render(v);
+}
+let curView = 'dashboard';
+document.querySelectorAll('nav.side button').forEach(b=>b.onclick=()=>setView(b.dataset.view));
+
+function trendSVG(points, unit, treatmentBands){
+  // 数值型指标：min-max 归一化折线（验收 A8）；治疗条与数据区分离
+  const W=680,H=180,px=46,py=18,iw=W-px-16,ih=H-py-30;
+  const vals=points.map(p=>p[1]), min=Math.min(...vals), max=Math.max(...vals);
+  const x=i=>points.length===1?iw/2:px+i*(iw/(points.length-1));
+  const y=v=>py+ih-((v-min)/((max-min)||1))*ih;
+  let s='<svg class="trend" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="指标趋势图">';
+  if(treatmentBands){ s+='<rect x="'+px+'" y="'+py+'" width="'+iw+'" height="'+ih+'" fill="#f2f6fa"/>';
+    treatmentBands.forEach(b=>{ s+='<rect x="'+x(b[0])+'" y="'+py+'" width="'+(x(b[1])-x(b[0]))+'" height="'+ih+'" fill="#dfe9f3" opacity=".6"/>'; });
+    s+='<text x="'+px+6+'" y="'+(py+14)+'" font-size="10" fill="#4a5568">治疗节点带（可关闭；关闭后数据点位置不变）</text>';
+  }
+  s+='<line x1="'+px+'" y1="'+(py+ih)+'" x2="'+(px+iw)+'" y2="'+(py+ih)+'" stroke="#e4e9ef"/>';
+  points.forEach((p,i)=>{ s+='<circle cx="'+x(i)+'" cy="'+y(p[1])+'" r="3.5" fill="#1B4F8A"/>';
+    s+='<text x="'+x(i)+'" y="'+(py+ih+14)+'" font-size="9.5" fill="#98a3b3" text-anchor="middle">'+p[0]+'</text>';
+    s+='<text x="'+x(i)+'" y="'+(y(p[1])-9)+'" font-size="10" fill="#12395f" text-anchor="middle">'+p[1]+'</text>'; });
+  if(points.length>1){ let path=''; points.forEach((p,i)=>path+=(i?'L':'M')+x(i)+' '+y(p[1])+' '); s+='<path d="'+path+'" fill="none" stroke="#1B4F8A" stroke-width="1.5"/>'; }
+  s+='<text x="'+px+'" y="'+py+'" font-size="10" fill="#98a3b3">'+unit+' · 纵轴为该序列自身 min–max 归一化，不代表绝对水平</text>';
+  s+='</svg>';
+  return s;
+}
+function statusChip(st){
+  if(st==='检出') return '<span class="chip chip-accent">检出</span>';
+  if(st==='野生型') return '<span class="chip chip-ok">野生型</span>';
+  if(st==='未检测') return '<span class="chip chip-mute">未检测</span>';
+  if(st==='待出') return '<span class="chip chip-warn">待出</span>';
+  return '<span class="chip chip-mute">'+st+'</span>';
+}
+
+const views = {
+dashboard(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>看板</h1><p>${p.name} · ${p.headline}</p></div>
+  <div class="grid3">
+    <div class="card"><h2>现在可以做</h2>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn-primary" onclick="setView('visit')">准备 11-04 复诊清单</button>
+        <button onclick="setView('gut')">${p.stoma?'记一条造口日记（约 30 秒）':'记一条排便自查'}</button>
+        <button onclick="setView('chart')">看 ${p.stoma?'CEA':'CEA'} 趋势</button>
+      </div>
+    </div>
+    <div class="card"><h2>CEA 最近 <span class="chip chip-mute">μg/L · 演示数据</span></h2>
+      ${trendSVG(p.cea.slice(-3),'CEA μg/L',null)}
+      <div class="muted">只呈现数值与趋势，单次异常不构成任何结论（产品立场 4）。</div>
+    </div>
+    ${p.stoma?`<div class="card"><h2>造口状态 <span class="chip chip-accent">专属卡</span></h2>
+      <dl class="kv"><dt>类型</dt><dd>${p.stoma.type}</dd><dt>位置</dt><dd>${p.stoma.pos}</dd><dt>日期</dt><dd>${p.stoma.date}</dd><dt>性质</dt><dd>${p.stoma.dur}</dd></dl>
+      <div class="notice">还纳评估（医生原话）：「${p.stoma.reversals[0].text}」<br><span class="muted">—— ${p.stoma.reversals[0].who} · ${p.stoma.reversals[0].d}</span></div>
+      <button onclick="setView('gut')">进入造口档案</button></div>`
+    :`<div class="card"><h2>肠道功能 <span class="chip">LARS 自查</span></h2>
+      <div class="big-num">${p.lars.records[p.lars.records.length-1].score}<span style="font-size:14px;color:var(--ink3)"> / 42</span></div>
+      <div class="big-label">${p.lars.records[p.lars.records.length-1].d} 自查</div>
+      <div class="notice-gray">${p.lars.tag}</div>
+      <button onclick="setView('gut')">看变化序列</button></div>`}
+  </div>
+  <div class="card"><h2>接下来</h2><table>
+    <tr><th>日期</th><th>事项</th><th>状态</th></tr>
+    <tr><td>${p.visit.next.split('·')[0]}</td><td>${p.visit.next.split('·').slice(1).join('·')||'复诊'}</td><td><span class="chip chip-accent">计划</span></td></tr>
+    <tr><td>遵医嘱</td><td>${p.visit.colonoscopy}</td><td><span class="chip chip-mute">待安排</span></td></tr>
+    ${cur==='B'?'<tr><td>2026-10-20</td><td>BRAF NGS 结果回报</td><td><span class="chip chip-warn">待出</span></td></tr>':''}
+  </table></div>
+  <div class="card"><h2>想问的事</h2><p>${p.visit.questions.length} 条已列入复诊清单 · ${p.visit.viewpoints.length} 条我的看法 <button style="margin-left:8px" onclick="setView('visit')">去整理</button></p></div>
+  </div>`;},
+
+typing(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>我的分型</h1><p>分期、部位与分子分型档案 · 所有条目可回原文</p></div>
+  <div class="card"><h2>分期与部位</h2><dl class="kv">
+    <dt>分期</dt><dd>${p.typing.stage}</dd><dt>原发部位</dt><dd>${p.typing.side} <span class="muted">（左右半/原发部位为独立字段，验收 A3）</span></dd>
+    <dt>病理类型</dt><dd>${p.typing.pathology}</dd><dt>依据</dt><dd>${p.typing.confirmBy}</dd></dl></div>
+  <div class="card"><h2>分子分型矩阵 <span class="chip chip-mute">未检测原样显示，不补成阴性（A1）</span></h2>
+    <table><tr><th>检测项</th><th>结果</th><th>状态</th><th>日期</th><th>来源</th></tr>
+    ${p.typing.molecular.map(m=>`<tr><td>${m.k}</td><td>${m.v}</td><td>${statusChip(m.st)}</td><td>${m.d}</td><td><a class="mono" href="#" onclick="alert('演示环境：回跳报告原件页。\\n来源：${m.src}');return false">${m.src}</a></td></tr>`).join('')}
+    </table>
+    <div class="notice-gray">MMR 与 MSI 是两项独立检测：本档案内各自成行；若结果不一致（如 pMMR 但 MSI-H），两行并列展示、不合并、不取舍（A2）。</div></div>
+  <div class="card"><h2>会诊与二次意见</h2><table><tr><th>日期</th><th>机构</th><th>结论</th><th>说明</th></tr>
+    ${p.typing.consult.map(c=>`<tr><td>${c.d}</td><td>${c.org}</td><td><span class="chip ${c.res==='结论一致'?'chip-ok':'chip-accent'}">${c.res}</span></td><td>${c.note}</td></tr>`).join('')}</table></div>
+  </div>`;},
+
+treatment(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>治疗历程</h1><p>按治疗线/阶段分组 · 更正只新增记录，不覆盖（产品立场 5）</p></div>
+  ${p.lines.map((ln,i)=>`<div class="card"><h2>${ln.name} <span class="chip ${i===p.lines.length-1?'chip-accent':'chip-mute'}">${ln.status}</span></h2>
+    <dl class="kv"><dt>方案</dt><dd>${ln.plan}</dd><dt>期间</dt><dd>${ln.period}</dd></dl>
+    <table style="margin-top:8px"><tr><th>程/次</th><th>计划日</th><th>实际日</th><th>说明</th></tr>
+    ${ln.cycles.map(c=>`<tr><td>${c[0]}</td><td>${c[1]}</td><td>${c[2]}</td><td>${c[3]==='—'?'<span class="muted">—</span>':c[3]}</td></tr>`).join('')}</table>
+    <div class="notice-gray">${ln.note}</div></div>`).join('')}
+  ${cur==='B'?`<div class="card"><h2>转化治疗与可切除性记录 <span class="chip chip-accent">专属</span></h2>
+    <table><tr><th>日期</th><th>类型</th><th>记录（原文）</th></tr>
+    <tr><td>2026-10-10</td><td><span class="chip chip-mute">影像评估</span></td><td>肝 S6/S7 两处病灶，较大者约 1.8cm（此前 3.2cm）—— 阅片报告原文</td></tr>
+    <tr><td>2026-10-12</td><td><span class="chip chip-accent">外科结论</span></td><td>「肝病灶从 3.2 缩到 1.8，两处都可切。继续化疗 2 程后再评估手术。」—— 肝胆外科门诊原话</td></tr>
+    </table>
+    <div class="notice-gray">影像评估与外科结论分列（A9）；界面不判断"能不能切"，评估结论以医生为准。</div></div>`:''}
+  </div>`;},
+
+gut(){ const p=P[cur];
+  if(!p.stoma && !p.lars) return '<div class="view active"><div class="card"><h2>肠道功能与造口</h2><p class="muted">本画像无造口记录。</p></div></div>';
+  return `<div class="view active">
+  <div class="page-head"><h1>肠道功能与造口</h1><p>结直肠癌专属模块 · 记录与回顾，不做护理指导与判断</p></div>
+  ${p.stoma?`
+  <div class="card"><h2>造口档案 <span class="chip chip-accent">A4：四要素</span></h2>
+    <dl class="kv"><dt>类型</dt><dd>${p.stoma.type}</dd><dt>位置</dt><dd>${p.stoma.pos}</dd><dt>日期</dt><dd>${p.stoma.date}</dd><dt>性质</dt><dd>${p.stoma.dur}</dd></dl>
+    <h2 style="margin-top:16px">还纳评估（只显示医生原话，无系统推断 · A7）</h2>
+    ${p.stoma.reversals.map(r=>`<div class="notice">「${r.text}」<br><span class="muted">—— ${r.who} · ${r.d}</span></div>`).join('')}</div>
+  <div class="card"><h2>造口日记 <span class="chip chip-mute">三键记录：用品 / 皮肤 / 排泄 · 每条约 30 秒</span>
+      <button style="margin-left:auto" onclick="alert('演示环境：真实实现为三键快记，漏记不提醒、不催促。')">＋ 记一条</button></h2>
+    <table><tr><th>日期</th><th>类目</th><th>记录</th><th>标记</th></tr>
+    ${p.stoma.diary.map(d=>`<tr><td>${d.d}</td><td>${d.kind}</td><td>${d.text}</td><td>${d.tag==='正常'?'<span class="chip chip-ok">正常</span>':d.tag==='观察'?'<span class="chip chip-warn">观察</span>':'<span class="chip chip-mute">记录</span>'}</td></tr>`).join('')}</table>
+    <div class="notice-gray">漏记一天不补不催：界面永不出现"你漏记了"（S2 失败恢复）。</div></div>
+  <div class="card"><h2>何时该联系团队</h2><div class="notice-gray">${p.stoma.threshold}</div></div>`
+  :`
+  <div class="card"><h2>排便功能（LARS 自查） <span class="chip chip-priv">自查记录，不是医生评估 · A6</span></h2>
+    <table><tr><th>日期</th><th>得分</th><th>原文照录</th></tr>
+    ${p.lars.records.map(r=>`<tr><td>${r.d}</td><td class="big-num" style="font-size:20px">${r.score}<span style="font-size:12px;color:var(--ink3)"> / 42</span></td><td>${r.raw}</td></tr>`).join('')}</table>
+    <div class="notice-gray">${p.lars.tag}</div>
+    <button onclick="this.closest('.card').querySelector('.newlars').style.display='block'">＋ 新增一次自查</button>
+    <div class="newlars" style="display:none;margin-top:10px"><div class="notice-gray">演示环境：真实实现为问卷填答后存档，界面不出现"严重/轻度"等分级结论。</div></div></div>
+  <div class="card"><h2>肠镜与息肉随访 <span class="chip chip-accent">A10</span></h2>
+    <table><tr><th>日期</th><th>事项</th></tr>
+    ${p.colon.nodes.map(n=>`<tr><td>${n.d}</td><td>${n.text}</td></tr>`).join('')}</table>
+    <div class="notice-gray">${p.colon.polyps}</div></div>`}
+  ${p.stoma?`<div class="card"><h2>肠镜与息肉随访 <span class="chip chip-accent">A10</span></h2>
+    <table><tr><th>日期</th><th>事项</th></tr>
+    <tr><td>2027-09（遵医嘱）</td><td>术后 1 年肠镜复查（还纳后安排）</td></tr>
+    <tr><td>2026-05-30</td><td>术前肠镜：直肠肿物；息肉 1 枚已切除（原文见报告）</td></tr></table></div>`:''}
+  </div>`;},
+
+labs(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>检查与指标</h1><p>数值型指标画趋势；分类变量只按节点呈现（产品立场 3）</p></div>
+  <div class="card"><h2>CEA <span class="chip chip-mute">μg/L · 默认第一位（A8）</span></h2>
+    ${trendSVG(p.cea,'CEA μg/L',null)}
+    <table style="margin-top:8px"><tr><th>日期</th><th>数值</th><th>参考区间</th><th>来源</th></tr>
+    ${p.labs.tumor.map(t=>`<tr><td>${t[0]}</td><td>${t[1]}</td><td class="mono">0–5.0（以报告为准）</td><td><a href="#" class="mono" onclick="alert('演示：回跳检验报告原件。');return false">检验报告</a></td></tr>`).join('')}</table></div>
+  <div class="card"><h2>血象与生化</h2><table><tr><th>日期</th><th>项目</th></tr>
+    ${p.labs.cbc.map(c=>`<tr><td>${c[0]}</td><td>${c[1]}</td></tr>`).join('')}</table>
+    <div class="notice-gray">偏低/偏高为报告原文标注；"记录到"不等于"提示"（产品立场 4）。</div></div>
+  <div class="card"><h2>影像</h2><table><tr><th>日期</th><th>检查</th><th>结论（原文摘录）</th></tr>
+    ${p.labs.imaging.map(i=>`<tr><td>${i[0]}</td><td>${i[1]}</td><td>${i[2]}</td></tr>`).join('')}</table></div>
+  </div>`;},
+
+chart(){ const p=P[cur];
+  const bands = p.lines.length>1 && cur==='A' ? [[0,0.24],[0.3,0.58]] : (cur==='B'?[[0,0.5]]:null);
+  return `<div class="view active">
+  <div class="page-head"><h1>病情一图秀</h1><p>治疗节点 + 可量化指标 · 治疗条与数据区分离（验收 A16 家族条目）</p></div>
+  <div class="card"><h2>CEA 全序列 <span class="chip chip-mute">min–max 归一化 · 图例写明范围</span></h2>
+    ${trendSVG(p.cea,'CEA μg/L',bands)}
+    <div class="notice-gray">纵轴范围：本序列 min–max（μg/L）；单点不连线；窗口内无数据时显示空态，不画零。</div></div>
+  <div class="card"><h2>体重序列 <span class="chip chip-mute">kg</span></h2>
+    ${trendSVG(p.nutrition,'体重 kg',null)}</div>
+  <div class="card"><h2>指标选择</h2>
+    <div style="display:flex;gap:6px;flex-wrap:wrap">
+      <span class="chip chip-accent">CEA（默认第一）</span><span class="chip">体重</span>${p.lars?'<span class="chip">LARS 自查（分类节点，不连折线）</span>':''}<span class="chip">血红蛋白</span>
+    </div>
+    <div class="notice-gray">分类变量（分期、分级、吞咽/排便自查档位）只按节点呈现，不画折线——防止"连成线就被读成趋势结论"。</div></div>
+  </div>`;},
+
+nutrition(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>营养支持</h1><p>进食与体重记录 · 只记录，不做营养处方</p></div>
+  <div class="card"><h2>体重 <span class="chip chip-mute">kg</span></h2>${trendSVG(p.nutrition,'体重 kg',null)}</div>
+  <div class="card"><h2>当下困扰</h2>
+    <table><tr><th>日期</th><th>困扰</th><th>记录</th></tr>
+    ${cur==='A'?`<tr><td>10-21</td><td>神经毒性</td><td>接触冷水/冷物时手指发麻加重（与第 2 程同期记录）</td></tr>
+      <tr><td>10-16</td><td>食欲</td><td>食量约为平时七成</td></tr>`:
+    `<tr><td>10-09</td><td>口腔黏膜炎</td><td>进食疼痛，以软食为主（第 3 程延迟原因）</td></tr>
+     <tr><td>10-24</td><td>食欲</td><td>口味改变，肉类不想吃</td></tr>`}</table>
+    <div class="notice-gray">困扰只做记录与就诊展示；处理方法以医生与营养科为准。</div></div>
+  </div>`;},
+
+mood(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>心理支持</h1><p>当下感受 / 造口与身体形象 / 生育与家庭</p></div>
+  <div class="card"><h2>我的看法与担心 <span class="chip chip-priv private-tag">不是医生结论 · 常驻标签（A12）</span></h2>
+    ${p.mood.map(m=>`<div class="card" style="margin-bottom:10px;background:var(--bg)">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><strong>${m.d}</strong>
+      ${m.priv?'<span class="chip chip-priv">私密 · 默认不进导出</span>':''}<span class="chip chip-mute">不是医生结论</span></div>
+      <p style="margin-top:6px">${m.text}</p></div>`).join('')}
+    <div class="notice-gray">看法与担心按"一条信息"记录：不进趋势、不进摘要事实区、不参与任何判断。</div></div>
+  <div class="card"><h2>${p.stoma?'造口与身体形象':'身体形象'}</h2>
+    <p class="muted">${p.stoma?'出门前的反复检查、怕被人注意到造口——这些感受可以记下来，复诊时一起交给医生或心理支持团队。':'治疗中的体型与体力变化记录。'}</p></div>
+  <div class="card"><h2>生育与家庭</h2><p class="muted">记录想聊的事，作为就诊讨论的入口；不做任何判断。</p></div>
+  </div>`;},
+
+visit(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>复诊准备</h1><p>复诊节奏 / 随访节点 / 就诊准备导出</p></div>
+  <div class="card"><h2>复诊节奏</h2><dl class="kv"><dt>下次复诊</dt><dd>${p.visit.next}</dd><dt>随访节点</dt><dd>${p.visit.colonoscopy}</dd></dl></div>
+  <div class="card"><h2>想问的事（勾选进导出）</h2>
+    ${p.visit.questions.map((q,i)=>`<label style="display:flex;gap:8px;align-items:flex-start;padding:6px 0"><input type="checkbox" class="qchk" checked> <span>${q}</span></label>`).join('')}</div>
+  <div class="card"><h2>我的看法与担心 <span class="chip chip-priv">不是医生结论</span></h2>
+    ${p.visit.viewpoints.map(v=>`<p>· ${v}</p>`).join('')}
+    <textarea rows="2" style="margin-top:10px" placeholder="补一条（演示环境：不保存）"></textarea></div>
+  <div class="card"><h2>导出预览 <span class="chip chip-mute">两区分离 · Markdown</span>
+    <button class="btn-primary" style="margin-left:auto" onclick="exportMD()">导出 .md</button></h2>
+    <div class="export-preview" id="exportPreview"></div>
+    <div class="notice-gray">两区顺序固定：先「想问的事」，后「我的看法与担心」，看法区首行带声明（A13）；私密条目不进导出（继承乳腺 D39 fail-closed）。</div></div>
+  </div>`;},
+
+trials(){ const p=P[cur];
+  return `<div class="view active">
+  <div class="page-head"><h1>临床研究</h1><p>线索浏览与入组问题准备</p></div>
+  <div class="notice">线索不是推荐 · 状态未核实 · 本页不排序、不评分、不预测获益（A15 / 产品立场 6）</div>
+  <div class="card"><h2>2026 登记线索 <span class="chip chip-warn">以下为模拟行 · 真实 2026 资料包见 docs/CLINICAL-DATA-2026.md</span></h2>
+    <table><tr><th>登记号</th><th>研究题目</th><th>分期</th><th>状态</th><th>来源</th></tr>
+    ${p.trialRows.map(r=>`<tr><td class="mono">${r[0]}</td><td>${r[1]}</td><td>${r[2]}</td><td><span class="chip chip-warn">${r[3]}</span></td><td class="mono">${r[4]}</td></tr>`).join('')}</table>
+    <div class="notice-gray">登记不证明有效、安全或正在开放入组；是否适合需由专业团队结合病理、分期、既往治疗判断，并回源核实。</div></div>
+  <div class="card"><h2>入组问题清单</h2>
+    ${['这项研究收什么分期和既往治疗？','需要带哪些检查结果？','在哪个中心、随访怎么安排？'].map(q=>`<label style="display:flex;gap:8px;padding:5px 0"><input type="checkbox" checked><span>${q}</span></label>`).join('')}
+    <div class="notice-gray">可勾选后并入复诊准备的导出清单。</div></div>
+  </div>`;}
+};
+
+function exportMD(){
+  const p=P[cur];
+  const qs=[...document.querySelectorAll('.qchk')].map((c,i)=>c.checked?p.visit.questions[i]:null).filter(Boolean);
+  const md=`# 复诊准备 · ${p.name} · ${new Date().toLocaleDateString('zh-CN')}\n\n> 本清单由工作台整理，供就诊沟通使用；工作台不做诊断与处置建议。\n\n## 一、想问的事\n\n${qs.map(q=>'- [ ] '+q).join('\n')||'- （未勾选）'}\n\n## 二、我的看法与担心\n\n> 以下均为患者/家属个人看法，不是医生结论。\n\n${p.visit.viewpoints.map(v=>'- '+v).join('\n')||'- （无）'}\n`;
+  el('exportPreview').textContent=md;
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob([md],{type:'text/markdown'}));
+  a.download='复诊准备-'+(cur==='A'?'李先生':'王女士')+'.md';
+  a.click();
+}
+function openSettings(){ el('mask').classList.add('open'); }
+function closeSettings(){ el('mask').classList.remove('open'); }
+function render(v){ el('main').innerHTML = views[v](); if(v==='visit') exportMD(); }
+render('dashboard');
+</script>
+</body>
+</html>

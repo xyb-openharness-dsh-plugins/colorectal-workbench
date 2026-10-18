@@ -1,0 +1,18 @@
+{
+  "packageName": "@xyb-community/colorectal-workbench",
+  "title": "小畅宝 Colopal 结直肠癌工作台（品牌占位）",
+  "repository": "https://github.com/xyb-community/colorectal-workbench",
+  "description": "本机优先的结直肠癌分子分型、肠道功能与造口护理、治疗历程与复诊准备工作台",
+  "slug": "colorectal",
+  "targetUsers": "结直肠癌（结肠癌、直肠癌）患者及照护者；不含肛管肿瘤（归小萌宝）",
+  "scenario": "刚确诊面对分期与MMR/MSI/RAS等分子报告看不懂；术后造口或肠道功能改变需要长期记录；肝肺转移患者的转化治疗与可切除性沟通；复诊与肠镜随访节奏管理",
+  "completion": "得到来源可追溯、可核对的个人病程档案：分型与分子依据、造口与肠道功能记录、治疗历程、标志物趋势、复诊准备材料；所有候选信息经用户核对入档，不提供诊断与治疗建议",
+  "coreFlow": [
+    "选择本机资料目录并导入病理/影像/检验报告",
+    "核对候选信息，建立分型与分子分型档案",
+    "记录造口状态与肠道功能变化",
+    "按治疗线整理方案、周期与标志物趋势",
+    "生成复诊与肠镜随访准备材料"
+  ],
+  "layoutMode": "business-first"
+}
