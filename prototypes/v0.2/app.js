@@ -85,7 +85,7 @@ const TRIALS = D.trials;
 /* ---------------- state ---------------- */
 const state = { view: 'dashboard', profile: 'A', agentOpen: false, agentSize: 'std', sel: ['cea', 'ca199', 'wt'],
   range: 'all', zoom: 100, toggles: { treatment: true, keypoints: true }, pin: null, saved: [], sub: {},
-  query: '', parsing: false, parseError: false, loaded: {} };
+  query: '', parsing: false, parseError: false, loaded: {}, parsingName: '', lastUpload: null, uploads: 0 };
 const defaultSel = (k) => (DASH_KEYS[k] || []).filter(c => { const m = METRICS[k][c]; return m && typeof m.points.find(p => typeof p.v === 'number')?.v === 'number'; }).slice(0, 3);
 const P = () => PROFILES[state.profile];
 const M = () => METRICS[state.profile];
@@ -518,10 +518,11 @@ function flowSteps(cur) {
 }
 function docsTable() {
   const docs = DOCS[state.profile].filter((d) => !state.query || d.name.includes(state.query) || d.type.includes(state.query));
+  const pillOf = (s) => s === '已核对' ? 'green' : s === '待解析' ? 'violet' : s === '解析失败' ? 'red' : 'yellow';
   return `<div class="table-wrap"><table><thead><tr><th>材料名称</th><th>日期</th><th>类型</th><th>整理状态</th><th>操作</th></tr></thead><tbody>
-    ${docs.map((d) => `<tr><td><b>${esc(d.name)}</b><br><small>模拟资料 · 无真实文件</small></td><td>${esc(d.date)}</td><td>${esc(d.type)}</td>
-      <td>${pill(d.status, d.status === '已核对' ? 'green' : 'yellow')}</td>
-      <td><button class="source-link" data-action="source" data-source="${esc(d.name)}">原文</button> ${d.status === '待核对' ? `<button class="source-link" data-action="go-rec-sub" data-sub-i="1">看草稿</button>` : ''}</td></tr>`).join('')}
+    ${docs.map((d) => `<tr><td><b>${esc(d.name)}</b><br><small>${esc(d.note || '模拟资料 · 无真实文件')}</small></td><td>${esc(d.date)}</td><td>${esc(d.type)}</td>
+      <td>${pill(d.status, pillOf(d.status))}</td>
+      <td><button class="source-link" data-action="source" data-doc="${esc(d.id)}">原文</button> ${d.status === '待核对' ? `<button class="source-link" data-action="go-rec-sub" data-sub-i="1">看草稿</button>` : ''}</td></tr>`).join('')}
   </tbody></table></div>${!docs.length ? '<div class="empty"><h3>没有找到这份材料</h3><p>试试「病理」「检验」或清空搜索。</p></div>' : ''}`;
 }
 function candidateRows() {
@@ -552,16 +553,77 @@ function metricSections() {
     return `<div class="section-title"><h2>${c}</h2>${tag}</div><div class="metric-grid">${ks.map((k) => mcard(k, m[k])).join('')}</div>`;
   }).join('');
 }
+/* ---------------- 本机文件上传（系统原生选择窗口） ---------------- */
+const TYPE_BY_EXT = { pdf: '报告', jpg: '影像', jpeg: '影像', png: '影像', heic: '影像', docx: '其他', doc: '其他', txt: '其他', xlsx: '检验' };
+function guessType(name) {
+  if (/病理|biopsy|patho/i.test(name)) return '病理';
+  if (/出院|住院|admission|discharge/i.test(name)) return '住院';
+  if (/基因|分子|检测|血常规|生化|化验|lab/i.test(name)) return '检验';
+  if (/(^|[^a-z])(ct|mri|pet)([^a-z]|$)|超声|影像/i.test(name)) return '影像';
+  return TYPE_BY_EXT[(name.split('.').pop() || '').toLowerCase()] || '其他';
+}
+const fmtSize = (n) => n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+const todayISO = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const DEMO_CAND = {
+  病理: ['病理分期（演示占位）', 'pT3N1bM0（演示值，待核对）'],
+  检验: ['最近一次肿瘤标志物（演示占位）', 'CEA 3.9 μg/L（演示值，待核对）'],
+  住院: ['出院日期（演示占位）', '2026-08-20（演示值，待核对）'],
+  影像: ['影像结论（演示占位）', '未见明确复发征象（演示值，待核对）'],
+  报告: ['报告日期（演示占位）', '2026-10-18（演示值，待核对）'],
+  其他: ['材料日期（演示占位）', '2026-10-18（演示值，待核对）']
+};
+
+function ingestFiles(fileList) {
+  const files = Array.from(fileList || []);
+  if (!files.length) return;
+  if (state.parsing) { toast('上一份还在解析，稍等一下'); return; }
+  const docs = DOCS[state.profile];
+  const fresh = [], dup = [], seen = new Set();
+  for (const f of files) {
+    const key = `${f.name}|${f.size}`;
+    if (seen.has(key) || docs.some((d) => d.fileName === f.name && d.size === f.size)) { dup.push(f.name); continue; }
+    seen.add(key); fresh.push(f);
+  }
+  if (!fresh.length) { toast('这些材料已在资料库（按文件名 + 大小去重），没有重复新增'); return; }
+  for (const f of fresh) {
+    const id = 'up' + Date.now().toString(36) + Math.random().toString(16).slice(2, 6);
+    docs.unshift({ id, name: f.name.replace(/\.[^.]+$/, ''), fileName: f.name, size: f.size, date: todayISO(),
+      type: guessType(f.name), status: '待解析', note: `本机文件 · ${fmtSize(f.size)}（只读文件名与大小）` });
+    state.uploads += 1;
+  }
+  state.lastUpload = docs[0] ? docs[0].id : null;
+  state.parsing = true; state.parseError = false; state.parsingName = fresh[0].name;
+  if (state.view !== 'records') { state.view = 'records'; location.hash = 'records'; }
+  state.sub.records = 0;
+  render();
+  setTimeout(() => {
+    for (const f of fresh) {
+      const d = docs.find((x) => x.fileName === f.name && x.size === f.size && x.status === '待解析');
+      if (!d) continue;
+      d.status = '待核对';
+      const [cn, cv] = DEMO_CAND[d.type] || DEMO_CAND.其他;
+      CANDS[state.profile].push({ id: 'cu' + d.id, name: cn, value: cv, source: `${d.name} · 第 1 页`, status: 'candidate' });
+    }
+    state.parsing = false; state.parsingName = '';
+    render();
+    toast(`已加入 ${fresh.length} 份材料，候选在「整理草稿 / 核对」${dup.length ? `；${dup.length} 份重复已跳过` : ''}`);
+  }, 900);
+}
+
 function vRecords() {
   const sub = SUBPAGES.records[state.sub.records || 0]; let body = '';
   if (sub === '资料库') {
-    body = `<div class="toolbar"><input aria-label="搜索模拟材料" placeholder="搜索材料名称或类型" value="${esc(state.query)}" data-action="records-search">
-      <div class="actions">${pill('全部为模拟数据', 'violet')}<button class="primary" data-action="load-report">载入模拟报告</button><button class="soft" data-action="parse-fail">演示解析失败</button></div></div>
-      ${state.parsing ? '<div class="card" role="status">正在解析模拟材料（演示）：上传 → 解析 → 出候选…</div>' : ''}
-      ${state.parseError ? `<div class="notice warn">模拟解析失败。材料仍保留在资料库，不产生候选，可重试或手工核对。<button class="source-link" data-action="retry">重试</button></div>` : ''}
+    body = `<div class="toolbar"><input aria-label="搜索材料名称或类型" placeholder="搜索材料名称或类型" value="${esc(state.query)}" data-action="records-search">
+      <div class="actions">${pill(state.uploads ? '含本机文件 · 只读文件名不读内容' : '全部为模拟数据', 'violet')}
+        <button class="primary" data-action="pick-file">上传本次资料</button>
+        <button class="soft" data-action="load-report">载入模拟报告</button>
+        <input type="file" id="file-picker" multiple hidden accept=".pdf,.jpg,.jpeg,.png,.heic,.docx,.doc,.txt,.xlsx">
+      </div></div>
+      ${state.parsing ? `<div class="card" role="status">正在解析「${esc(state.parsingName || '本次资料')}」…原件留在本机，解析结果只作候选</div>` : ''}
+      ${state.parseError ? `<div class="notice warn">解析失败。材料仍保留在资料库，不产生候选，可重试或手工核对。<button class="source-link" data-action="retry">重试</button></div>` : ''}
       <div class="card" id="docs-table">${docsTable()}</div>
-      ${flowSteps('文件解析')}
-      <div class="help-box">演示链路：文件上传 → 解析出候选字段 → 在「整理草稿 / 核对」逐项确认 → 接受后才写入数据库。解析失败不产生候选，原件不删、随时可重试；「载入模拟报告」会完整走一遍成功链路。</div>`;
+      ${flowSteps('文件上传')}
+      <div class="help-box">上传走系统原生文件选择窗口：选中的文件只读取<b>文件名与大小</b>，原型不读取内容、不上传云端。解析→候选→核对→接受入库的完整链路可用「载入模拟报告」演示；解析失败不产生候选，原件不删、随时可重试。<button class="source-link" data-action="parse-fail">演示解析失败</button></div>`;
   } else if (sub === '整理草稿 / 核对') {
     const pending = CANDS[state.profile].filter((c) => c.status !== 'accepted').length;
     body = `${flowSteps('确认指标')}
@@ -768,7 +830,12 @@ document.addEventListener('click', (e) => {
     'go-trials': () => { state.view = 'trials'; location.hash = 'trials'; render(); },
     'go-records': () => { state.view = 'records'; location.hash = 'records'; render(); },
     'go-rec-sub': (el) => { state.view = 'records'; state.sub.records = +el.dataset.subI; location.hash = 'records'; render(); },
-    source: (el) => openDialog('小畅宝', '原文出处', `<p style="font-size:12.5px">${esc(el.dataset.source)}</p><p class="small-note">原件存放在你选的资料目录 imports/ 下（演示：不展示文件内容）。工作台不改动原文，也不替你解释它。</p>`, '<button class="primary" data-action="close">关闭</button>'),
+    source: (el) => {
+      const d = el.dataset.doc ? DOCS[state.profile].find((x) => x.id === el.dataset.doc) : null;
+      const line = d ? `${d.fileName || d.name}${d.size ? ` · ${fmtSize(d.size)}` : ''}（${d.date}）` : el.dataset.source || '';
+      openDialog('小畅宝', '原文出处', `<p style="font-size:12.5px">${esc(line)}</p><p class="small-note">原件存放在你选的资料目录 imports/ 下；工作区不改动原文，也不替你解释它。</p>`, '<button class="primary" data-action="close">关闭</button>');
+    },
+    'pick-file': () => { const inp = $('#file-picker'); if (inp && typeof inp.click === 'function') inp.click(); else toast('当前浏览器不支持选择本机文件'); },
     'load-report': () => {
       if (state.parsing) return;
       if (state.loaded[state.profile]) { toast('模拟报告已载入，没有重复新增'); return; }
@@ -781,7 +848,12 @@ document.addEventListener('click', (e) => {
         toast('解析完成：候选已放入「整理草稿 / 核对」');
       }, 900);
     },
-    'parse-fail': () => { state.parseError = true; render(); },
+    'parse-fail': () => {
+      const d = DOCS[state.profile].find((x) => x.id === state.lastUpload);
+      if (d) d.status = '解析失败';
+      state.parseError = true; render();
+      toast(d ? `「${d.name}」解析失败：未产生候选，原件保留，可重试` : '模拟解析失败：未产生候选，原件保留');
+    },
     retry: () => { state.parseError = false; toast('模拟重试完成；原件始终保留'); render(); },
     candidate: (el) => {
       const c = CANDS[state.profile].find((x) => x.id === el.dataset.id);
@@ -839,6 +911,7 @@ document.addEventListener('input', (e) => {
   }
 });
 document.addEventListener('change', (e) => {
+  if (e.target && e.target.id === 'file-picker') { ingestFiles(e.target.files); e.target.value = ''; return; }
   const el = e.target.closest('[data-action]');
   if (el && el.dataset.action === 'zoom') { state.zoom = Number(el.value); render(); }
 });
