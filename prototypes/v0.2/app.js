@@ -130,7 +130,7 @@ function mcard(key, m) {
   return `<button class="mcard" data-mcard="${key}" aria-pressed="false" onclick="flipCard('${key}')" title="轻点翻面看参考区间与说明">
     <span class="mcard-inner">
     <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
-      <span class="val">${last.v.toFixed(m.dec ?? 1)}<small>${esc(m.unit)}</small></span>
+      <span class="val"><span data-countup="${last.v}" data-dec="${m.dec ?? 1}">${last.v.toFixed(m.dec ?? 1)}</span><small>${esc(m.unit)}</small></span>
       ${d ? `<span class="delta">较上次 <em>${d.text}${m.unit ? ' ' + esc(m.unit) : ''}</em>（${esc(d.from)}）</span>` : ''}
       ${band}</span>
     <span class="mface back">${cat}<span class="name">${esc(m.name)}</span>
@@ -697,6 +697,27 @@ function dlgExport() {
 }
 
 /* ---------------- render root ---------------- */
+/* 数字刷动：渲染后从 0 滚动到目标值（easeOutCubic，650ms；reduced-motion 直接显示终值） */
+function animateCountups(root) {
+  if (!root || typeof root.querySelectorAll !== 'function' || typeof requestAnimationFrame !== 'function') return;
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const DUR = 650;
+  root.querySelectorAll('[data-countup]').forEach((el) => {
+    const target = parseFloat(el.dataset.countup);
+    if (!isFinite(target)) return;
+    const dec = el.dataset.dec === undefined ? 1 : +el.dataset.dec;
+    const t0 = performance.now();
+    const step = (t) => {
+      const k = Math.min(1, (t - t0) / DUR);
+      const ease = 1 - Math.pow(1 - k, 3);
+      el.textContent = (target * ease).toFixed(dec);
+      if (k < 1) requestAnimationFrame(step); else el.textContent = target.toFixed(dec);
+    };
+    el.textContent = (0).toFixed(dec);
+    requestAnimationFrame(step);
+  });
+}
+
 function render() {
   const p = P();
   $('#nav').innerHTML = PAGES.map(([id, label, ic]) => {
@@ -709,6 +730,7 @@ function render() {
   $('#profile-avatar').textContent = p.name[0];
   $('#main').innerHTML = (VIEWS[state.view] || vDashboard)();
   $('#main').classList.remove('page-enter');
+  animateCountups($('#main'));
   renderAgent();
   if (state.agentOpen) $('#agent-body').dataset.built = ''; // 换页后重建挂载位提示
 }
