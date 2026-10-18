@@ -36,3 +36,5 @@ HTML原型关口：路径/版本/hash、实际预览证据、用户确认范围/
 - **D7（本轮产出）**：`docs/MONITORING-METRICS.md`——六类指标体系（A 治疗期安全 / B 疗效评估 / C 术后监测节奏 / D 分子与遗传 / E 功能长程 / F 营养生活方式），来源=NCCN 2025 patients + NCCN 2025.V2/.V4/.V5 译本 + CSCO 2025 + 五指南对比综述；二手低可信网页（CEA 每月一次等）弃用并留痕。ctDNA/PET 呈现为"指南不推荐常规"，防过度检查焦虑。
 - **D8（发现的真实缺口）**：画像 A 为 dMMR，按 CSCO ≤70 岁 CRC 均进入 Lynch 筛查——demo 漏了；画像 B 用贝伐，血压/蛋白尿序列漏了。v0.2 回填。
 - **AI 面板（上一需求，进行中）**：右侧 dsh 原生会话挂载位——CSS 已进 demo 文件，`examples/agent-panel.mjs` 状态机/prompt 纯函数已写；demo 内 JS 接线与文档待做，与 v0.2 回填一起交付。
+
+- **D9（用户确认后执行，2026-10-18）**：仓库纳管 —— `github.com/xyb-openharness-dsh-plugins/colorectal-workbench`（private、MIT、main 分支，SSH samqin123）；`package.json` repository 字段由 `xyb-community/*` 占位改为 org 实址，license 由 UNLICENSED 改为 MIT 与 LICENSE 文件对齐；README 参照 xyb-workbench 体例新写（致谢小x宝社区志愿者 sam）。git 推送 ≠ 市场投稿，将来若需 public 另行授权。
