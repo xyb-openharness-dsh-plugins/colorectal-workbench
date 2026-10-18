@@ -331,68 +331,103 @@ function vDashboard() {
 
 function vSubtype() {
   const p = P();
+  const i = state.sub.subtype || 0;
   const matrix = p.molecular.map(x => `<div class="row"><div class="row-main"><div><b>${esc(x.k)}</b><p>${esc(x.note)}</p></div></div>
     <div style="text-align:right">${pill(x.v, x.state === 'ok' ? 'green' : x.state === 'warn' ? 'yellow' : 'grey')}<small style="display:block;margin-top:4px">${esc(x.src)}</small></div></div>`).join('');
-  const lynch = p.lynch ? `<div class="card accent"><div class="card-head"><h2>${esc(p.lynch.title)}</h2>${pill('只记录安排，不做筛查建议', 'violet')}</div>
-    ${p.lynch.rows.map(r => row(`<b>${esc(r[1])}</b>`, esc(r[2]), `<small>${esc(r[0])}</small>`)).join('')}</div>` : '';
-  return `<div class="page-enter">${pageHead(true)}
-  <div class="subtype-hero"><div><span class="code">病理与分期档案</span><h2>${esc(p.stage)}</h2><span class="en">${esc(p.path[0])} · 依据：病理报告原件（已归档）</span>
+  const lynchCard = p.lynch ? `<div class="card accent"><div class="card-head"><h2>${esc(p.lynch.title)}</h2>${pill('只记录安排，不做筛查建议', 'violet')}</div>
+    ${p.lynch.rows.map(r => row(`<b>${esc(r[1])}</b>`, esc(r[2]), `<small>${esc(r[0])}</small>`)).join('')}</div>`
+    : `<div class="empty"><h3>本档案没有 Lynch 筛查安排</h3><p>遗传评估由医生根据家族史决定；这里只记录已安排的项目，不主动建议筛查。</p></div>`;
+  const pathology = `<div class="subtype-hero"><div><span class="code">病理与分期档案</span><h2>${esc(p.stage)}</h2><span class="en">${esc(p.path[0])} · 依据：病理报告原件（已归档）</span>
     <div class="subtype-meta">${p.path.map(s => pill(s, 'violet')).join('')}</div></div>
-    <div class="path-tree">${p.path.map((s, i) => `<div class="${i === 0 ? 'on' : ''} ${i > 0 ? 'lv' + Math.min(i, 3) : ''}">${esc(s)}</div>`).join('')}</div></div>
-  <div class="section-title"><h2>分子分型矩阵</h2><span class="source-link">未检测 ≠ 阴性</span></div>
-  <div class="card">${matrix}<p class="small-note">矩阵里每一项独立成立：未检测的项目原样显示"未检测"，不补成阴性；每项可在原件里回溯。</p></div>
-  ${lynch ? `<div class="section-title"><h2>遗传筛查</h2></div>${lynch}` : ''}
-  <div class="section-title"><h2>会诊与二次意见</h2></div>
-  <div class="card">${row('<b>2026-08-30 · 肿瘤科</b>', '制定辅助/转化方案；记录医生原话要点。', pill('已存档', 'green'))}
-  ${row('<b>2026-09-05 · 营养科</b>', p.stoma ? '造口饮食过渡指导；记录要点。' : '治疗期营养指导；记录要点。', pill('已存档', 'green'))}</div></div>`;
+    <div class="path-tree">${p.path.map((s, j) => `<div class="${j === 0 ? 'on' : ''} ${j > 0 ? 'lv' + Math.min(j, 3) : ''}">${esc(s)}</div>`).join('')}</div></div>
+    <p class="small-note">分期与病理以病理报告原件为准；不同标本、不同时间的结论分别保留，不用新报告覆盖旧记录。</p>`;
+  const consult = `<div class="section-title"><h2>会诊与二次意见</h2></div>
+    <div class="card">${row('<b>2026-08-30 · 肿瘤科</b>', '制定辅助/转化方案；记录医生原话要点。', pill('已存档', 'green'))}
+    ${row('<b>2026-09-05 · 营养科</b>', p.stoma ? '造口饮食过渡指导；记录要点。' : '治疗期营养指导；记录要点。', pill('已存档', 'green'))}
+    <p class="small-note">二次意见不是"换医生"，是带着原件去核对方案；工作台只帮你把材料理好。</p></div>`;
+  const bodies = [
+    `<div class="section-title"><h2>分子分型矩阵</h2><span class="source-link">未检测 ≠ 阴性</span></div><div class="card">${matrix}<p class="small-note">矩阵里每一项独立成立：未检测的项目原样显示"未检测"，不补成阴性；每项可在原件里回溯。</p></div>`,
+    pathology,
+    lynchCard,
+    consult
+  ];
+  return `<div class="page-enter">${pageHead(true)}${bodies[i] || bodies[0]}</div>`;
 }
 
 function vTreatment() {
   const p = P();
-  const lines = p.lines.map((l, i) => `<button class="line-chip" aria-pressed="${i === 0}">${esc(l.name)}</button>`).join('');
+  const i = state.sub.treatment || 0;
+  const lines = p.lines.map((l, j) => `<button class="line-chip" aria-pressed="${j === 0}">${esc(l.name)}</button>`).join('');
   const cycles = `<div class="table-wrap"><table class="cycle-table"><thead><tr><th>周期</th><th>日期</th><th>用药</th><th>状态</th></tr></thead><tbody>
     ${p.cycles.map(c => `<tr class="${c[4] ? 'done' : 'next'}"><td><b>${esc(c[0])}</b></td><td class="num">${esc(c[1])}</td><td>${esc(c[2])}</td><td>${pill(c[3], c[4] ? 'green' : 'violet')}</td></tr>`).join('')}</tbody></table></div>
     <p class="small-note">周期记录来自出院小结与输液记录原件；更正只新增版本，不覆盖旧记录。</p>`;
   const resect = p.resect ? `<div class="section-title"><h2>${esc(p.resect.title)}</h2></div><div class="card">
     <p class="small-note" style="margin-top:0">影像评估与外科结论分列留痕；每次评估都是新记录，不改写历史。</p>
-    ${p.resect.rows.map(r => row(`<b>${esc(r[0])}</b>`, esc(r[1]), `<small style="max-width:220px;text-align:right">${esc(r[2])}</small>`)).join('')}</div>` : '';
-  return `<div class="page-enter">${pageHead(true)}
-  <div class="line-strip">${lines}<button class="line-chip" data-action="add-line">+ 治疗线</button></div>
-  <div class="plan-card"><div><span class="eyebrow">当前方案</span><div class="big">${esc(p.lines[0].name)}<small>${esc(p.lines[0].detail)}</small></div>
+    ${p.resect.rows.map(r => row(`<b>${esc(r[0])}</b>`, esc(r[1]), `<small style="max-width:220px;text-align:right">${esc(r[2])}</small>`)).join('')}</div>`
+    : `<div class="empty"><h3>本档案暂无可切除性评估</h3><p>该评估用于转移性 / 局部进展情形下的外科结论留痕；本档案为术后辅助治疗路径，没有这类评估。如后续病情变化出现评估，会按时间留痕在这里。</p></div>`;
+  const bodies = [
+    `<div class="line-strip">${lines}<button class="line-chip" data-action="add-line">+ 治疗线</button></div>
+    <div class="plan-card"><div><span class="eyebrow">当前方案</span><div class="big">${esc(p.lines[0].name)}<small>${esc(p.lines[0].detail)}</small></div>
     <div class="progress"><i style="width:${Math.round(p.cycles.filter(c => c[4]).length / Math.max(p.cycles.length, 1) * 100)}%"></i></div></div>
     <button class="primary" data-action="go-timeline">与指标对照</button></div>
-  <div class="section-title"><h2>周期与用药</h2></div><div class="card">${cycles}</div>${resect}</div>`;
+    <p class="small-note">治疗线与方案来自出院小结与医嘱原件；换线、调药以医生决定为准，工作台只做记录。</p>`,
+    `<div class="section-title"><h2>周期与用药</h2></div><div class="card">${cycles}</div>`,
+    resect
+  ];
+  return `<div class="page-enter">${pageHead(true)}${bodies[i] || bodies[0]}</div>`;
+}
+
+function endoscopeCard() {
+  const p = P();
+  const scope = p.rhythm.filter(r => /肠镜|内镜/.test(r[0]));
+  return `<div class="section-title"><h2>肠镜与息肉随访</h2><span class="source-link">按指南摘录 · 以医生安排为准</span></div>
+  <div class="card">${scope.length ? scope.map(r => row(`<b>${esc(r[0])}</b>`, `${esc(r[1])} — ${esc(r[2])}`, `<small>${esc(r[3])}</small>`)).join('') : '<p>本档案暂无肠镜随访安排。</p>'}
+  ${p.lynch ? `<div class="notice">${esc(p.lynch.title)}：若遗传评估确认相关，内镜起始年龄与间隔以遗传门诊意见为准。</div>` : ''}
+  <p class="small-note">发现息肉后，下一次肠镜的时间由病理结果决定；工作台只记录安排，不推导间隔。</p></div>`;
 }
 
 function vStoma() {
   const p = P();
-  if (!p.stoma) return `<div class="page-enter">${pageHead(true)}
-    <div class="empty"><h3>本档案没有造口记录</h3><p>王女士当前为转化治疗路径，未行造口。如后续手术方式变化，可在这里建档。</p>
-    <div class="actions" style="justify-content:center"><button class="soft" data-action="go-labs">去看检查与指标</button></div></div>
-    <div class="section-title"><h2>LARS 自查</h2></div>
-    <div class="empty"><p>无 LARS 自查记录。LARS 适用于保肛术后排便功能自查；如医生安排相关评估，会出现在这里。</p></div></div>`;
+  const i = state.sub.stoma || 0;
+  if (!p.stoma) {
+    const empties = [
+      ['本档案没有造口记录', '王女士当前为转化治疗路径，未行造口。如后续手术方式变化，可在这里建档。'],
+      ['还没有三键日记', '三键日记跟随造口档案出现；本档案未行造口，因此没有日记入口。'],
+      ['LARS 不适用于本档案', 'LARS 用于保肛术后的排便功能自查；本档案未行相关手术，没有自查记录。']
+    ];
+    if (i < 3) return `<div class="page-enter">${pageHead(true)}
+      <div class="empty"><h3>${empties[i][0]}</h3><p>${empties[i][1]}</p>
+      <div class="actions" style="justify-content:center"><button class="soft" data-action="go-labs">去看检查与指标</button></div></div></div>`;
+    return `<div class="page-enter">${pageHead(true)}${endoscopeCard()}</div>`;
+  }
   const s = p.stoma;
   const diary = s.diary.map(d => row(`<b>${esc(d[0])} · ${esc(d[1])}：${esc(d[2])}</b>`, esc(d[3]), '')).join('');
   const lars = p.lars.map(l => `<div class="dv on"><span>${esc(l.d)} 自查</span><b>${l.score}</b><p>${esc(l.band)}（0–42 分）</p></div>`).join('');
-  return `<div class="page-enter">${pageHead(true)}
-  <div class="ww-hero"><span class="eyebrow">造口档案</span><div class="big">${esc(s.type)}</div>
-    <p>${esc(s.site)} · ${esc(s.date)} 手术。还纳计划：${esc(s.plan)}。当前用品：${esc(s.supplies)}。</p>
-    <div class="actions"><button class="primary" data-action="add-diary">记一条（30 秒）</button><button class="soft" data-action="export-stoma">就诊时展示</button></div></div>
-  <div class="section-title"><h2>三键日记</h2><span class="source-link">漏记不催不补</span></div>
-  <div class="card">${diary}</div>
-  <div class="section-title"><h2>求助门槛清单</h2></div>
-  <div class="notice warn"><b>出现以下情况建议尽快联系造口门诊或主管医生：</b><div class="flag-list">${s.thresholds.map(t => `<div>${esc(t)}</div>`).join('')}</div>
-  <p class="small-note">这份清单来自造口护理常规资料（原件已归档）；它不判断你现在的情况，只帮你识别何时求助。</p></div>
-  <div class="section-title"><h2>LARS 排便功能自查</h2><span class="source-link">自查记录，不是医生评估</span></div>
-  <div class="card"><div class="dv-row">${lars}</div><p class="small-note">LARS 评分 0–42：0–20 无／轻度，21–29 中度，30–42 重度；这里只存自查结果与日期。</p></div></div>`;
+  const bodies = [
+    `<div class="ww-hero"><span class="eyebrow">造口档案</span><div class="big">${esc(s.type)}</div>
+      <p>${esc(s.site)} · ${esc(s.date)} 手术。还纳计划：${esc(s.plan)}。当前用品：${esc(s.supplies)}。</p>
+      <div class="actions"><button class="primary" data-action="add-diary">记一条（30 秒）</button><button class="soft" data-action="export-stoma">就诊时展示</button></div></div>
+    <div class="section-title"><h2>求助门槛清单</h2></div>
+    <div class="notice warn"><b>出现以下情况建议尽快联系造口门诊或主管医生：</b><div class="flag-list">${s.thresholds.map(t => `<div>${esc(t)}</div>`).join('')}</div>
+    <p class="small-note">这份清单来自造口护理常规资料（原件已归档）；它不判断你现在的情况，只帮你识别何时求助。</p></div>`,
+    `<div class="section-title"><h2>三键日记</h2><span class="source-link">漏记不催不补</span></div><div class="card">${diary}</div>`,
+    `<div class="section-title"><h2>LARS 排便功能自查</h2><span class="source-link">自查记录，不是医生评估</span></div>
+    <div class="card"><div class="dv-row">${lars}</div><p class="small-note">LARS 评分 0–42：0–20 无／轻度，21–29 中度，30–42 重度；这里只存自查结果与日期。</p></div>`,
+    endoscopeCard()
+  ];
+  return `<div class="page-enter">${pageHead(true)}${bodies[i] || bodies[0]}</div>`;
 }
 
 function vLabs() {
   const p = P();
+  const i = state.sub.labs || 0;
   const img = p.resect ? row('<b>2026-10-09 · 胸腹盆增强 CT</b>', '肝转移灶 2 枚较前缩小；原文已归档。', pill('PR', 'green')) : row('<b>2026-10-12 · 胸腹盆 CT</b>', '术后改变，未见明确复发征象（影像原文为准）。', pill('已归档', 'green'));
-  return `<div class="page-enter">${pageHead(true)}${metricSections()}
-  <div class="section-title"><h2>影像评估</h2></div><div class="card">${img}</div>
-  <p class="small-note">指标卡轻点翻面看参考区间与口径说明；分类记录（神经毒性、尿蛋白等）不翻面、不连线。</p></div>`;
+  if (i === 0) return `<div class="page-enter">${pageHead(true)}${metricSections(['肿瘤标志物'])}
+    <p class="small-note">同一实验室可比；指标卡轻点翻面看参考区间与口径说明。</p></div>`;
+  if (i === 1) return `<div class="page-enter">${pageHead(true)}${metricSections(['血象', '生化', '电解质', '贝伐监测', '治疗毒性'])}
+    <p class="small-note">治疗期安全监测项与方案相关：血象 / 生化按周期查，电解质看方案，毒性只记原话不分级；分类记录不翻面、不连线。</p></div>`;
+  return `<div class="page-enter">${pageHead(true)}<div class="section-title"><h2>影像评估</h2><span class="source-link">结论以报告原文为准</span></div>
+    <div class="card">${img}</div><p class="small-note">工作台不解读影像；每次评估都是新记录，不改写历史。</p></div>`;
 }
 
 function vTimeline() {
@@ -544,9 +579,9 @@ function pathologyCard() {
       <button class="source-link" data-action="go-rec-sub" data-sub-i="1">继续整理材料 →</button></section>
   </div>`;
 }
-function metricSections() {
+function metricSections(cats = CAT_ORDER) {
   const m = M();
-  return CAT_ORDER.map((c) => {
+  return cats.map((c) => {
     const ks = Object.keys(m).filter((k) => m[k].cat === c);
     if (!ks.length) return '';
     const tag = c === '肿瘤标志物' ? '<span class="source-link">同一实验室可比</span>' : c === '治疗毒性' ? '<span class="source-link">只记原话，不分级</span>' : c === '电解质' ? '<span class="source-link">方案相关关注项</span>' : '';
@@ -755,7 +790,11 @@ function dlgHelp() {
 function dlgExport() {
   const p = P();
   const md = ['# 复诊准备（演示导出）', '', `档案：${p.name}（${p.meta}）`, '', '## 事实区（已核对）', ...p.rhythm.map(r => `- ${r[0]}：${r[1]}（${r[2]}）`), '', '## 想问的事 / 我的看法（不是医生结论）', '- （按页面勾选结果导出；私密条目默认不含）', '', '> 本文件由工作台整理，不构成医疗建议。'].join('\n');
-  openDialog('小畅宝', '导出预览（Markdown）', `<div class="agent-card"><pre>${esc(md)}</pre></div><p class="small-note">导出分两区；「我的看法」永远带"不是医生结论"标注。</p>`, '<button class="soft" data-action="close">取消</button><button class="primary" data-action="close">保存到资料目录</button>');
+  openDialog('小畅宝', '导出预览（Markdown）', `
+    <div id="export-view" class="agent-card"><pre>${esc(md)}</pre></div>
+    <textarea id="export-edit" hidden aria-label="编辑导出内容" style="width:100%;min-height:240px;font:12px/1.7 ui-monospace,SFMono-Regular,monospace;padding:10px;border:1px solid var(--line,#d8e0ea);border-radius:10px;background:#fff;color:var(--ink,#213139)">${esc(md)}</textarea>
+    <p class="small-note">导出分两区；「我的看法」永远带"不是医生结论"标注。可先编辑再保存，保存的是编辑后的全文。</p>`,
+    '<button class="soft" data-action="close">取消</button><button class="soft" data-action="export-toggle-edit" id="export-edit-btn">编辑</button><button class="primary" data-action="export-save">保存到资料目录</button>');
 }
 
 /* ---------------- render root ---------------- */
@@ -836,6 +875,22 @@ document.addEventListener('click', (e) => {
       openDialog('小畅宝', '原文出处', `<p style="font-size:12.5px">${esc(line)}</p><p class="small-note">原件存放在你选的资料目录 imports/ 下；工作区不改动原文，也不替你解释它。</p>`, '<button class="primary" data-action="close">关闭</button>');
     },
     'pick-file': () => { const inp = $('#file-picker'); if (inp && typeof inp.click === 'function') inp.click(); else toast('当前浏览器不支持选择本机文件'); },
+    'export-toggle-edit': () => {
+      const view = $('#export-view'), ta = $('#export-edit'), btn = $('#export-edit-btn');
+      if (!view || !ta) return;
+      const editing = !ta.hidden;
+      ta.hidden = editing; view.hidden = editing;
+      if (btn) btn.textContent = editing ? '编辑' : '预览';
+    },
+    'export-save': () => {
+      const ta = $('#export-edit');
+      const txt = ta && !ta.hidden ? ta.value.trim() : '';
+      if (!txt) { toast('导出内容是空的；取消编辑或先填一点内容。'); return; }
+      const docs = DOCS[state.profile];
+      docs.unshift({ id: 'ex' + Date.now().toString(36), name: `复诊准备 · ${P().name} · ${todayISO()}`, fileName: `复诊准备-${todayISO()}.md`, size: new Blob([txt]).size, date: todayISO(), type: '其他', status: '待核对', note: '生成文件 · 由导出创建，可在草稿里核对' });
+      closeDialog();
+      toast('已保存到资料目录 exports/（演示）；在「病情整理 · 资料库」可见');
+    },
     'load-report': () => {
       if (state.parsing) return;
       if (state.loaded[state.profile]) { toast('模拟报告已载入，没有重复新增'); return; }
