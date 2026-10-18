@@ -42,6 +42,9 @@ const SUBPAGES = {
   treatment: ['治疗线与方案', '周期与用药', '可切除性评估'],
   stoma: ['造口档案', '三键日记', 'LARS 自查', '肠镜与息肉随访'],
   labs: ['肿瘤标志物', '治疗期安全监测', '影像评估'],
+  timeline: ['数值曲线', '分类与事件', '数据口径'],
+  nutrition: ['进食与体重', '饮食笔记', '运动与生活'],
+  mind: ['当下感受', '身体形象', '家庭沟通'],
   review: ['监测节奏', '就诊准备'],
   trials: ['2026 线索', '已收藏', '入组问题']
 };
@@ -58,168 +61,20 @@ const SUBTITLES = {
   trials: '线索不是推荐；先弄清入组条件，再决定要不要问。'
 };
 
-/* ---------------- 模拟档案 ---------------- */
-const PROFILES = {
-  A: {
-    name: '陈先生', sex: '男', age: 62,
-    meta: '62 岁 · 乙状结肠癌 ⅢB',
-    headline: '乙状结肠癌 ⅢB（pT3N1bM0）术后，辅助治疗中，临时回肠造口',
-    stage: 'ⅢB 期（pT3N1bM0）',
-    molecular: [
-      { k: 'MMR / MSI', v: 'dMMR / MSI-H', src: '病理免疫组化 2026-08-16', state: 'ok', note: '错配修复蛋白缺失（MLH1/PMS2）' },
-      { k: 'RAS', v: '未检测', src: '—', state: 'na', note: '报告中未见；可在外科/肿瘤科随访时问' },
-      { k: 'BRAF', v: '未检测', src: '—', state: 'na', note: '报告中未见；可在外科/肿瘤科随访时问' },
-      { k: 'HER2', v: '未检测', src: '—', state: 'na', note: '报告中未见' },
-      { k: 'DPYD', v: '未检出致病变异', src: '用药前基因检测 2026-09-15', state: 'ok', note: '氟尿嘧啶类用药前检测' },
-      { k: 'PIK3CA', v: '未检测', src: '—', state: 'na', note: 'Ⅲ期可讨论；与阿司匹林二级预防相关，只记录不推荐' }
-    ],
-    lynch: {
-      title: 'Lynch 综合征筛查（dMMR 触发）',
-      rows: [
-        ['2026-08-20', '血样送检：MLH1 / PMS2 胚系检测', '肿瘤科安排，结果未回'],
-        ['—', '家属筛查事宜', '待结果回后与医生讨论；本页只记录安排，不做筛查建议']
-      ]
-    },
-    path: ['乙状结肠腺癌', 'pT3N1bM0 · ⅢB', 'dMMR / MSI-H', '临时回肠造口（保护性）'],
-    lines: [
-      { name: '手术 · 2026-08-14', detail: '腹腔镜乙状结肠切除术 + 临时回肠造口（保护低位吻合）', done: true },
-      { name: '辅助治疗 CAPEOX', detail: '计划 6 周期 · 2026-09-22 开始，现第 2 周期', done: false }
-    ],
-    cycles: [
-      ['第 1 周期', '2026-09-22', '奥沙利铂 + 卡培他滨', '已完成', true],
-      ['第 2 周期', '2026-10-13', '奥沙利铂 + 卡培他滨', '进行中', false]
-    ],
-    rhythm: [
-      ['CEA', '每 3 个月，术后 2 年内', 'NCCN 2025', '下次：2027-01（随访窗口以医生安排为准）'],
-      ['胸腹盆 CT', '每 6–12 个月，共 5 年', 'CSCO 2025 / NCCN 2025', '下次：2027-02 前后'],
-      ['肠镜', '术后 1 年（2027-08）', 'NCCN 2025', '如发现腺瘤，间隔缩短——以医生安排为准'],
-      ['体格检查（含直肠指诊）', '每 3–6 个月', 'CSCO 2025', '每次复诊随诊']
-    ],
-    resect: null,
-    stoma: {
-      type: '临时回肠造口（保护性）', site: '右下腹', date: '2026-08-14', plan: '拟术后 6 个月左右评估还纳，以医生安排为准',
-      supplies: '两件式造口袋 · 造口底盘每 3–4 天更换',
-      diary: [
-        ['2026-10-16', '用品', '正常', '更换底盘，无渗漏'],
-        ['2026-10-16', '皮肤', '轻度发红', '周围皮肤泛红，已拍照；无破溃'],
-        ['2026-10-15', '排泄', '水样偏多', '一天 6–7 次，进食粥后减少'],
-        ['2026-10-14', '用品', '正常', '—'],
-        ['2026-10-13', '皮肤', '正常', '—']
-      ],
-      thresholds: ['造口周围皮肤破溃、持续渗血', '排泄突然明显减少或停止（伴腹痛腹胀）', '造口颜色变暗发黑']
-    },
-    lars: [{ d: '2026-09-15', score: 26, band: '重度', note: '还纳前基线自查；还纳后 3、6 个月各一次', self: true }],
-    mindset: '手术后第一次化疗前比较紧张，想弄清 dMMR 对方案意味着什么。'
-  },
-  B: {
-    name: '王女士', sex: '女', age: 55,
-    meta: '55 岁 · 直肠癌 Ⅳ 期（肝转移）',
-    headline: '直肠癌 Ⅳ 期（肝转移）转化治疗中，pMMR/MSS，RAS 突变，贝伐方案',
-    stage: 'Ⅳ 期（肝转移，转化治疗中）',
-    molecular: [
-      { k: 'MMR / MSI', v: 'pMMR / MSS', src: '病理免疫组化 2026-07-02', state: 'ok', note: '错配修复蛋白完整' },
-      { k: 'RAS', v: 'KRAS G12D 突变', src: 'NGS 报告 2026-07-05', state: 'warn', note: '抗 EGFR 类药物通常不适用（以医生解读为准）' },
-      { k: 'BRAF', v: '野生型', src: 'NGS 报告 2026-07-05', state: 'ok', note: '—' },
-      { k: 'HER2', v: '阴性（IHC 1+）', src: '免疫组化 2026-07-02', state: 'ok', note: '—' },
-      { k: 'DPYD', v: '未检出致病变异', src: '用药前基因检测 2026-07-05', state: 'ok', note: '—' },
-      { k: 'PIK3CA', v: '未检测', src: '—', state: 'na', note: '—' }
-    ],
-    lynch: null,
-    path: ['直肠腺癌', 'cT3N2M1（肝） · Ⅳ', 'pMMR / MSS · KRAS G12D', '转化治疗中'],
-    lines: [
-      { name: '转化治疗 FOLFIRI + 贝伐', detail: '2026-07-10 起，已完成 6 周期；下次 MDT 评估可切除性', done: false },
-      { name: '基线', detail: '2026-07-01 确诊；肝转移灶 2 枚（S4/S7）', done: true }
-    ],
-    cycles: [
-      ['第 5 周期', '2026-09-18', 'FOLFIRI + 贝伐', '已完成', true],
-      ['第 6 周期', '2026-10-09', 'FOLFIRI + 贝伐', '已完成', true],
-      ['第 7 周期', '2026-10-30', '视 10-27 评估结果', '待定', false]
-    ],
-    rhythm: [
-      ['CEA / 影像评估', '治疗中每 6–8 周一次', 'NCCN 2025（Ⅳ期治疗中）', '下次评估：2026-10-27'],
-      ['CEA', '稳定期每 3 个月，前 2 年', 'NCCN 2025', '以医生安排为准'],
-      ['胸腹盆 CT', '前 2 年每 3–6 个月', 'CSCO 2025', '以医生安排为准'],
-      ['血压 / 尿蛋白（贝伐期间）', '每周期前', '用药监测（说明书/共识）', '与血常规同天抽血']
-    ],
-    resect: {
-      title: '可切除性评估（MDT）',
-      rows: [
-        ['2026-10-09', '肝转移灶 2 枚较基线缩小（S4 18mm，S7 12mm）；影像评估原文：PR', '外科：继续 2 周期后复评；原话已存档'],
-        ['2026-08-30', '肝转移灶较基线缩小；影像评估原文：SD→PR 之间', '外科：暂不手术，继续转化'],
-        ['2026-07-01', '基线：肝 S4/S7 两枚转移灶；原发灶距肛 6cm', 'MDT：先转化治疗']
-      ]
-    },
-    stoma: null,
-    lars: [],
-    mindset: '最担心的是肝转移能不能切；每次 MDT 结论都想留个原文。'
-  }
-};
-
-/* 指标数据（band=参考区间；分类变量 dec:null 不翻面不连线） */
-const METRICS = {
-  A: {
-    cea: { name: 'CEA', unit: 'ng/mL', cat: '肿瘤标志物', color: '#1b4f8a', dec: 1, band: [0, 5], note: '同一实验室、同一方法可比；单次升高不特指复发', points: [
-      { d: '2026-08-10', v: 18.6, src: '术前' }, { d: '2026-09-20', v: 6.2, src: '第 1 周期前' }, { d: '2026-10-12', v: 3.1, src: '第 2 周期前' }] },
-    wt: { name: '体重', unit: 'kg', cat: '功能与体重', color: '#4a6fa5', dec: 1, note: '化疗期 ±5% 内波动常见；持续下降需就诊时提出', points: [
-      { d: '2026-08-10', v: 68.4, src: '术前' }, { d: '2026-09-20', v: 65.9, src: '第 1 周期前' }, { d: '2026-10-12', v: 65.2, src: '第 2 周期前' }] },
-    alb: { name: '白蛋白', unit: 'g/L', cat: '生化', color: '#9a6410', dec: 0, band: [40, 55], note: '营养与肝脏合成的综合反映', points: [
-      { d: '2026-08-10', v: 39, src: '术前' }, { d: '2026-09-20', v: 41, src: '第 1 周期前' }, { d: '2026-10-12', v: 40, src: '第 2 周期前' }] },
-    hgb: { name: '血红蛋白', unit: 'g/L', cat: '血象', color: '#a03d5c', dec: 0, band: [130, 175], note: '不同医院参考区间不合并', points: [
-      { d: '2026-08-10', v: 121, src: '术前' }, { d: '2026-09-22', v: 118, src: '第 1 周期' }, { d: '2026-10-13', v: 124, src: '第 2 周期' }] },
-    anc: { name: '中性粒细胞', unit: '10⁹/L', cat: '血象', color: '#c2687f', dec: 2, band: [1.8, 6.3], note: '每周期前必查；偏低时化疗可能推迟', points: [
-      { d: '2026-09-22', v: 3.4, src: '第 1 周期' }, { d: '2026-10-13', v: 2.1, src: '第 2 周期' }] },
-    alt: { name: 'ALT', unit: 'U/L', cat: '生化', color: '#b07c2a', dec: 0, band: [9, 50], note: '—', points: [
-      { d: '2026-08-10', v: 24, src: '术前' }, { d: '2026-09-22', v: 31, src: '第 1 周期' }, { d: '2026-10-13', v: 28, src: '第 2 周期' }] },
-    cre: { name: '肌酐', unit: 'μmol/L', cat: '生化', color: '#2f6f66', dec: 0, band: [57, 111], note: '—', points: [
-      { d: '2026-08-10', v: 74, src: '术前' }, { d: '2026-10-13', v: 78, src: '第 2 周期' }] },
-    neuro: { name: '奥沙利铂神经毒性', unit: '', cat: '治疗毒性', color: '#c2551f', dec: null, kind: 'grade', note: '只记录你的原话，不做分级判断', points: [
-      { d: '2026-10-14', v: '遇冷手指发麻，2 天缓解', src: '第 2 周期后自查' }] }
-  },
-  B: {
-    cea: { name: 'CEA', unit: 'ng/mL', cat: '肿瘤标志物', color: '#1b4f8a', dec: 1, band: [0, 5], note: '转化治疗中每周期评估', points: [
-      { d: '2026-07-01', v: 96.4, src: '基线' }, { d: '2026-08-30', v: 41.2, src: 'MDT-1' }, { d: '2026-10-09', v: 15.8, src: 'MDT-2' }] },
-    ca199: { name: 'CA19-9', unit: 'U/mL', cat: '肿瘤标志物', color: '#8a4f9e', dec: 0, band: [0, 37], note: '与 CEA 一起看；Lewis 阴性人群不表达（本档案表达）', points: [
-      { d: '2026-07-01', v: 312, src: '基线' }, { d: '2026-10-09', v: 68, src: 'MDT-2' }] },
-    wt: { name: '体重', unit: 'kg', cat: '功能与体重', color: '#4a6fa5', dec: 1, note: '—', points: [
-      { d: '2026-07-01', v: 57.2, src: '基线' }, { d: '2026-08-30', v: 56.1, src: 'MDT-1' }, { d: '2026-10-09', v: 56.8, src: 'MDT-2' }] },
-    alb: { name: '白蛋白', unit: 'g/L', cat: '生化', color: '#9a6410', dec: 0, band: [40, 55], note: '—', points: [
-      { d: '2026-07-01', v: 36, src: '基线' }, { d: '2026-10-09', v: 39, src: 'MDT-2' }] },
-    hgb: { name: '血红蛋白', unit: 'g/L', cat: '血象', color: '#a03d5c', dec: 0, band: [115, 150], note: '—', points: [
-      { d: '2026-07-10', v: 108, src: '第 1 周期' }, { d: '2026-10-09', v: 112, src: '第 6 周期' }] },
-    anc: { name: '中性粒细胞', unit: '10⁹/L', cat: '血象', color: '#c2687f', dec: 2, band: [1.8, 6.3], note: '—', points: [
-      { d: '2026-07-10', v: 4.8, src: '第 1 周期' }, { d: '2026-09-18', v: 1.4, src: '第 5 周期（曾推迟 1 周）' }, { d: '2026-10-09', v: 2.6, src: '第 6 周期' }] },
-    bps: { name: '收缩压', unit: 'mmHg', cat: '贝伐监测', color: '#33608f', dec: 0, band: [90, 139], note: '贝伐相关高血压：每周期前测；新发升高需当次告知医生', points: [
-      { d: '2026-07-10', v: 118, src: '第 1 周期' }, { d: '2026-08-18', v: 126, src: '第 3 周期' }, { d: '2026-09-18', v: 142, src: '第 5 周期（加测确认 138）' }, { d: '2026-10-09', v: 132, src: '第 6 周期' }] },
-    proU: { name: '尿蛋白', unit: '', cat: '贝伐监测', color: '#2f6f66', dec: null, kind: 'qual', note: '定性结果只按原文记录，不做半定量折算', points: [
-      { d: '2026-09-18', v: '1+', src: '第 5 周期尿常规' }, { d: '2026-10-09', v: '±', src: '第 6 周期尿常规' }] },
-    neuro: { name: '伊立替康胃肠反应', unit: '', cat: '治疗毒性', color: '#c2551f', dec: null, kind: 'grade', note: '只记录你的原话，不做分级判断', points: [
-      { d: '2026-09-19', v: '输注当晚腹泻 3 次，服药后缓解', src: '第 5 周期后自查' }] }
-  }
-};
-
-/* 图表里的治疗节点 */
-const EVENTS = {
-  A: [
-    { d: '2026-08-14', label: '手术 + 造口' }, { d: '2026-09-22', label: 'CAPEOX-1' }, { d: '2026-10-13', label: 'CAPEOX-2' }
-  ],
-  B: [
-    { d: '2026-07-01', label: '基线确诊' }, { d: '2026-07-10', label: 'FOLFIRI+贝伐-1' }, { d: '2026-08-30', label: 'MDT-1' }, { d: '2026-10-09', label: 'MDT-2' }
-  ]
-};
-
-/* 2026 临床试验：真实登记摘录（ClinicalTrials.gov，采集 2026-10-18），状态未核实 */
-const TRIALS = [
-  ['NCT07549399', '短程放疗+化疗靶向免疫新辅助治疗高危 pMMR/MSS 局晚期直肠癌', 'Ⅲ期', '招募中', '中山大学附属第六医院'],
-  ['NCT07505472', '短程放疗序贯 CapeOX+特瑞普利单抗 ± 舒法替尼新辅助治疗中低位局晚期直肠癌', 'Ⅱ/Ⅲ期', '招募中', '吉林大学第一医院'],
-  ['NCT07361003', 'Suvemcitug + FTD/TPI 用于难治性转移性结直肠癌（Ib/Ⅲ期）', 'Ⅲ期', '招募中', '先声药业'],
-  ['NCT07595276', 'Enlituo® vs Erbitux®+FOLFOX（RAS/BRAF 野生型 MSS/pMMR）', 'Ⅲ期', '招募中', '泰州迈博太蔻药业'],
-  ['NCT07462143', 'RC148 联合化疗一线治疗不可切除或转移性结直肠癌', 'Ⅱ/Ⅲ期', '招募中', '荣昌生物'],
-  ['NCT07729605', 'FOLFIRI + 贝伐珠单抗 + QL1706 二线治疗 mCRC', 'Ⅲ期', '尚未招募', '中山大学'],
-  ['NCT07730489', 'BL-M07D1 vs 医生选择（HER2 IHC3+ 后线）', 'Ⅲ期', '尚未招募', '四川百利药业'],
-  ['NCT07483684', 'TQB2102 治疗 HER2 IHC3+ 晚期结直肠癌（后线）', 'Ⅲ期', '尚未招募', '正大天晴'],
-  ['NCT07877597', '化疗 ± 短程放疗新辅助治疗高危局晚期 pMMR/MSS 结肠癌', 'Ⅲ期', '尚未招募', '复旦大学'],
-  ['NCT07585279', '脂质体伊立替康 mCRC 二线治疗', 'Ⅱ/Ⅲ期', '尚未招募', '河北医科大学第四医院']
-].map(([id, title, phase, status, sponsor]) => ({ id, title, phase, status, sponsor, url: 'https://clinicaltrials.gov/study/' + id }));
+/* ---------------- 数据层（由 demo/build-demo-data.mjs 生成；改数据请改生成器重跑） ---------------- */
+const D = window.DEMO_DATA;
+const PROFILES = {}, METRICS = {}, EVENTS = {}, DASH_KEYS = {};
+for (const [k, p] of Object.entries(D.profiles)) {
+  PROFILES[k] = { name: p.name, sex: p.sex, age: p.age, meta: p.meta, headline: p.headline, stage: p.stage, mindset: p.mindset,
+    molecular: p.molecular, lynch: p.lynch, path: p.path, lines: p.lines, cycles: p.cycles, rhythm: p.rhythm,
+    resect: p.resect, stoma: p.stoma, lars: p.lars, viewpoints: p.viewpoints,
+    nutritionNotes: p.nutritionNotes, activity: p.activity, familyTalk: p.familyTalk };
+  METRICS[k] = {};
+  for (const m of p.metrics) METRICS[k][m.key] = m;
+  EVENTS[k] = p.events;
+  DASH_KEYS[k] = p.dash_keys;
+}
+const TRIALS = D.trials;
 
 /* ---------------- state ---------------- */
 const state = { view: 'dashboard', profile: 'A', agentOpen: false, agentSize: 'std', picked: ['cea', 'wt'], saved: [], sub: {} };
@@ -319,9 +174,7 @@ function vDashboard() {
   const rhythm = `<div class="card"><div class="card-head"><h2>监测节奏（按 ${esc(p.stage)} 取值）</h2><span class="source-link">NCCN 2025 · CSCO 2025</span></div>
     ${p.rhythm.map(r => row(`<b>${r[0]}</b>`, `${r[1]} — ${r[2]}`, `<small>${esc(r[3])}</small>`)).join('')}
     <p class="small-note">以上为指南常见节奏摘录，仅供准备讨论；实际安排以你的医生为准。</p></div>`;
-  const cards = p.resect
-    ? ['cea', 'ca199', 'bps', 'wt', 'alb', 'anc'].map(k => m[k] ? mcard(k, m[k]) : '').join('')
-    : ['cea', 'wt', 'alb', 'hgb'].map(k => mcard(k, m[k])).join('');
+  const cards = (DASH_KEYS[state.profile] || []).filter(k => m[k]).map(k => mcard(k, m[k])).join('');
   return `<div class="page-enter">${pageHead()}
   <div class="hero"><div><span class="eyebrow">当前情况</span><h1>${esc(p.headline)}</h1><p>${esc(p.mindset)}</p>
     <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button></div></div>
@@ -399,24 +252,17 @@ function vStoma() {
 
 function vLabs() {
   const m = M(), p = P();
-  const safety = ['hgb', 'anc', 'alt', 'cre'].map(k => mcard(k, m[k])).join('');
-  const tox = m.neuro ? mcard('neuro', m.neuro) : '';
-  const bev = m.bps ? `<div class="section-title"><h2>贝伐珠单抗监测（本方案专属）</h2></div>
-    <div class="metric-grid">${mcard('bps', m.bps)}${mcard('proU', m.proU)}</div>
-    <p class="small-note">血压与尿蛋白随每周期前检查；新发升高或 1+ 以上在就诊时主动提出。</p>` : '';
-  const ceaRows = ['cea', 'ca199'].filter(k => m[k]).map(k => {
-    const t = `<div class="table-wrap"><table><thead><tr><th>日期</th><th>结果</th><th>来源</th></tr></thead><tbody>
-    ${m[k].points.map(pt => `<tr><td class="num">${esc(pt.d)}</td><td class="num"><b>${pt.v}</b> ${esc(m[k].unit)}</td><td>${esc(pt.src)}</td></tr>`).join('')}</tbody></table></div>`;
-    return `<div class="section-title"><h2>${esc(m[k].name)}（参考 ${m[k].band[0]}–${m[k].band[1]}）</h2></div><div class="card">${t}</div>`;
+  const cats = ['肿瘤标志物', '血象', '生化', '电解质', '营养', '贝伐监测', '治疗毒性'];
+  const sections = cats.map(c => {
+    const ks = Object.keys(m).filter(k => m[k].cat === c);
+    if (!ks.length) return '';
+    const tag = c === '肿瘤标志物' ? '<span class="source-link">同一实验室可比</span>' : c === '治疗毒性' ? '<span class="source-link">只记原话，不分级</span>' : c === '电解质' ? '<span class="source-link">方案相关关注项</span>' : '';
+    return `<div class="section-title"><h2>${c}</h2>${tag}</div><div class="metric-grid">${ks.map(k => mcard(k, m[k])).join('')}</div>`;
   }).join('');
   const img = p.resect ? row('<b>2026-10-09 · 胸腹盆增强 CT</b>', '肝转移灶 2 枚较前缩小；原文已归档。', pill('PR', 'green')) : row('<b>2026-10-12 · 胸腹盆 CT</b>', '术后改变，未见明确复发征象（影像原文为准）。', pill('已归档', 'green'));
-  return `<div class="page-enter">${pageHead(true)}
-  <div class="section-title"><h2>肿瘤标志物</h2><span class="source-link">同一实验室可比</span></div><div class="metric-grid">${mcard('cea', m.cea)}${m.ca199 ? mcard('ca199', m.ca199) : ''}</div>
-  ${ceaRows}
-  <div class="section-title"><h2>治疗期安全监测</h2><span class="source-link">每周期前</span></div>
-  <div class="metric-grid">${safety}${tox}</div>
-  ${bev}
-  <div class="section-title"><h2>影像评估</h2></div><div class="card">${img}</div></div>`;
+  return `<div class="page-enter">${pageHead(true)}${sections}
+  <div class="section-title"><h2>影像评估</h2></div><div class="card">${img}</div>
+  <p class="small-note">指标卡轻点翻面看参考区间与口径说明；分类记录（神经毒性、尿蛋白等）不翻面、不连线。</p></div>`;
 }
 
 function vTimeline() {
@@ -438,34 +284,35 @@ function vTimeline() {
 function vNutrition() {
   const m = M(), p = P();
   return `<div class="page-enter">${pageHead(true)}
-  <div class="hero" style="grid-template-columns:minmax(0,1fr)"><div><span class="eyebrow">进食与体重</span><h1>吃得下、吃得够，就是这一阶段最重要的事</h1><p>工作台只记录体重、白蛋白与你的饮食笔记，不计算每一口，也不提供营养处方。</p>
-  <div class="actions"><button class="primary" data-action="add-meal">记一笔饮食</button><button class="soft" data-action="go-labs">看白蛋白趋势</button></div></div></div>
+  <div class="hero" style="grid-template-columns:minmax(0,1fr)"><div><span class="eyebrow">进食与体重</span><h1>吃得下、吃得够，就是这一阶段最重要的事</h1><p>工作台只记录体重、白蛋白/前白蛋白与你的饮食笔记，不计算每一口，也不提供营养处方。</p>
+  <div class="actions"><button class="primary" data-action="add-meal">记一笔饮食</button><button class="soft" data-action="go-labs">看营养指标</button></div></div></div>
   <div class="dash-cols"><div class="stack">
-    <div class="card"><div class="card-head"><h2>体重 / 白蛋白</h2><span class="source-link">数值线 · 翻面看参考区间</span></div><div class="metric-grid">${mcard('wt', m.wt)}${mcard('alb', m.alb)}</div></div>
+    <div class="card"><div class="card-head"><h2>体重 / 白蛋白 / 前白蛋白</h2><span class="source-link">数值线 · 翻面看参考区间</span></div>
+      <div class="metric-grid">${mcard('wt', m.wt)}${m.alb ? mcard('alb', m.alb) : ''}${m.pa ? mcard('pa', m.pa) : ''}</div></div>
     <div class="card"><div class="card-head"><h2>饮食笔记</h2></div>
-      ${p.stoma ? row('<b>2026-10-15</b>', '粥 + 蒸蛋，排泄 6–7 次偏水样；减少粗纤维后好转。') + row('<b>2026-10-13</b>', '化疗第 2 周期当天胃口差，下午加餐酸奶。')
-      : row('<b>2026-10-09</b>', 'MDT-2 当天食欲一般；加餐 2 次。') + row('<b>2026-09-20</b>', '食欲恢复，正餐正常。')}
+      ${p.nutritionNotes.map(n => row(`<b>${esc(n[0])}</b>`, esc(n[1]))).join('')}
       <p class="small-note">只记"吃了什么、身体反应"，不做食材替换建议。</p></div></div>
   <div class="stack"><div class="card"><div class="card-head"><h2>运动与生活</h2><span class="source-link">NCCN 2025 已纳入辅助治疗原则</span></div>
-    ${row('<b>本周活动</b>', '散步 4 次 × 20 分钟（自记）。')}
+    ${row('<b>本周活动</b>', esc(p.activity))}
     ${row('<b>补充剂 / 其他用药</b>', '只记医嘱原文与起止，工作台不做推荐。', pill('无在用', 'grey'))}
     <p class="small-note">运动以你能承受的强度为准；是否调整由医生或康复师决定。</p></div></div></div></div>`;
 }
 
 function vMind() {
   const p = P();
+  const feels = p.viewpoints.filter(v => v[1] !== '身体形象');
+  const body = p.viewpoints.find(v => v[1] === '身体形象');
   return `<div class="page-enter">${pageHead(true)}
   <div class="notice violet">这里的内容<b>默认私密</b>：不进导出、不进看板摘要；只有你显式开放时才会出现在就诊材料里。</div>
   <div class="dash-cols"><div class="stack">
     <div class="card"><div class="card-head"><h2>当下感受</h2>${pill('私密', 'violet')}</div>
-      ${row('<b>2026-10-14 · 有点低落</b>', esc(p.mindset), pill('不是医生结论', 'grey'))}
-      ${row('<b>2026-09-21 · 平静</b>', '第 1 周期顺利结束，情绪平稳。', pill('不是医生结论', 'grey'))}
+      ${feels.map(v => row(`<b>${esc(v[0])} · ${esc(v[1])}</b>`, esc(v[2]), pill('不是医生结论', 'grey'))).join('')}
       <div class="actions"><button class="soft" data-action="add-viewpoint">记一条感受</button></div></div></div>
   <div class="stack"><div class="card"><div class="card-head"><h2>身体形象与社交</h2>${pill('私密', 'violet')}</div>
-      ${p.stoma ? row('<b>2026-10-02</b>', '开始自己换造口袋了；出门前会多看一眼衣服遮不遮得住。') : row('<b>2026-09-30</b>', '治疗期间不太想见人，先和家人说了。')}
+      ${body ? row(`<b>${esc(body[0])}</b>`, esc(body[2])) : row('<b>暂无记录</b>', '愿意的时候再写；这条只属于你。')}
       <p class="small-note">这些记录只属于你；是否与家人、医生分享由你决定。</p></div>
     <div class="card"><div class="card-head"><h2>想对家人说 / 家庭沟通</h2></div>
-      ${row('<b>待沟通</b>', p.lynch ? 'Lynch 结果回来后，如何和兄弟姐妹讲筛查这件事。' : '治疗费用与工作安排，想和女儿谈一次。')}</div></div></div></div>`;
+      ${row('<b>待沟通</b>', esc(p.familyTalk))}</div></div></div></div>`;
 }
 
 function vReview() {
@@ -670,4 +517,6 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#dial
 $('#font-toggle').addEventListener('click', () => { const on = document.body.classList.toggle('large'); $('#font-toggle').setAttribute('aria-pressed', String(on)); });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== state.view && VIEWS[v]) { state.view = v; render(); } });
 
+const initialHash = location.hash.slice(1);
+if (VIEWS[initialHash]) state.view = initialHash;
 render();

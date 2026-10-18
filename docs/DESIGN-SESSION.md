@@ -40,3 +40,5 @@ HTML原型关口：路径/版本/hash、实际预览证据、用户确认范围/
 - **D9（用户确认后执行，2026-10-18）**：仓库纳管 —— `github.com/xyb-openharness-dsh-plugins/colorectal-workbench`（private、MIT、main 分支，SSH samqin123）；`package.json` repository 字段由 `xyb-community/*` 占位改为 org 实址，license 由 UNLICENSED 改为 MIT 与 LICENSE 文件对齐；README 参照 xyb-workbench 体例新写（致谢小x宝社区志愿者 sam）。git 推送 ≠ 市场投稿，将来若需 public 另行授权。
 
 - **D10（用户反馈，2026-10-18）**：v0.2 视觉风格被否定（"太丑"），指定参考淋巴瘤 demo。执行：多文件原型 v0.2 目录，CSS 以淋巴瘤为基底色值重映射，交互基因全量继承；家族视觉体系统一自此确立（后续胃/食管/宫颈批量直接复用此 style.css 映射方法）。教训：**新癌种 demo 应在首轮就继承已确认的家族视觉，不要另起炉灶**。
+
+- **D11（用户反馈，2026-10-18）**：一图秀/营养支持空页（SUBPAGES 缺键，真实 bug，冒烟测试自此纳入惯例）；指标太少 → 建 demo/ 数据层（生成器→sqlite+js 双产物，唯一数据源），2 档案 48 指标 152 点。教训：**视图配置表必须穷举所有视图键**，冒烟测试应覆盖全视图×全档案矩阵。
