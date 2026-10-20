@@ -1,10 +1,16 @@
 /* 小畅宝 Colopal · 演示数据生成器（唯一数据源）
    产出：demo/demo-data.sqlite（可 SQL 查询）+ prototypes/v0.2/demo-data.js（原型只读数据层）
    原则：全部患者数据为虚构模拟；试验表为真实登记摘录（状态未核实）。
-   运行：node demo/build-demo-data.mjs  —— 改数据只改这里，两个产物一起重生成。 */
+   运行：node demo/build-demo-data.mjs  —— 改数据只改这里，两个产物一起重生成。
+
+   两种用法：
+   1. 直接跑（CLI）：写上面两个产物，行为与以前完全一致；
+   2. 被 import：只拿到 `buildDemoProfiles()` 返回的纯数据，一个字节都不碰磁盘
+      —— 开发版的 `dsh/demo.js` 靠它把演示档案写进本机 sqlite，
+      因此"演示数据"仍然只有这一份定义，不会长出第二个数据源。 */
 import { DatabaseSync } from 'node:sqlite';
-import { writeFileSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { writeFileSync, realpathSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -272,7 +278,38 @@ const DATA = {
   ].map(([id, title, phase, status, sponsor]) => ({ id, title, phase, status, sponsor, url: 'https://clinicaltrials.gov/study/' + id }))
 };
 
+/* ---------- 纯数据出口（不碰磁盘） ---------- */
+
+/** 演示档案的纯数据：`{ profiles: {A, B}, trials, meta }`。开发版播种与两个产物都从这里取。 */
+export function buildDemoProfiles() {
+  return { profiles: DATA.profiles, trials: DATA.trials, meta: buildMeta() };
+}
+
+/** demo_meta 的内容：一段免责声明 + 几条统计，落进 sqlite 的 demo_meta 表。 */
+function buildMeta() {
+  return [
+    ['disclaimer', '全部患者数据为虚构模拟，仅供原型演示；trials 表为真实登记摘录，状态未核实'],
+    ['generated_at', new Date().toISOString()],
+    ['source', 'demo/build-demo-data.mjs（唯一数据源）'],
+    ['subjects', '2'],
+    ['metrics_rows', String(Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.length, 0))],
+    ['points_rows', String(Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.reduce((b, m) => b + m.points.length, 0), 0))],
+  ];
+}
+
+/** 只有 `node demo/build-demo-data.mjs` 才落盘；被 import 时不写任何东西。 */
+function isDirectRun() {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(resolve(entry)) === realpathSync(fileURLToPath(import.meta.url));
+  } catch {
+    return false;
+  }
+}
+
 /* ---------- 产 1：SQLite ---------- */
+function writeSqlite() {
 const db = new DatabaseSync(join(ROOT, 'demo/demo-data.sqlite'));
 db.exec(`
 DROP TABLE IF EXISTS metric_points; DROP TABLE IF EXISTS metrics; DROP TABLE IF EXISTS molecular;
@@ -280,7 +317,9 @@ DROP TABLE IF EXISTS events; DROP TABLE IF EXISTS rhythm; DROP TABLE IF EXISTS c
 DROP TABLE IF EXISTS stoma_diary; DROP TABLE IF EXISTS lars; DROP TABLE IF EXISTS resect_rows; DROP TABLE IF EXISTS lynch_rows;
 DROP TABLE IF EXISTS viewpoints; DROP TABLE IF EXISTS nutrition_notes; DROP TABLE IF EXISTS trials; DROP TABLE IF EXISTS subjects; DROP TABLE IF EXISTS demo_meta;
 DROP TABLE IF EXISTS documents; DROP TABLE IF EXISTS candidate_fields; DROP TABLE IF EXISTS pathology_rows;
-CREATE TABLE subjects (profile_key TEXT PRIMARY KEY, name TEXT, sex TEXT, age INTEGER, meta TEXT, headline TEXT, stage TEXT, mindset TEXT, dash_keys TEXT, path TEXT);
+/* subjects 的后 7 列与 schema/0001_initial.sql 一致（档案级标量 + 分节标题），
+   改这里要同步改 schema，反之亦然——两边是同一套列的镜像。 */
+CREATE TABLE subjects (profile_key TEXT PRIMARY KEY, name TEXT, sex TEXT, age INTEGER, meta TEXT, headline TEXT, stage TEXT, mindset TEXT, dash_keys TEXT, path TEXT, activity TEXT, family_talk TEXT, lynch_title TEXT, resect_title TEXT, stoma_json TEXT, pathology_title TEXT, pathology_status TEXT);
 CREATE TABLE metrics (profile_key TEXT, key TEXT, name TEXT, unit TEXT, cat TEXT, color TEXT, dec INTEGER, kind TEXT, band_low REAL, band_high REAL, note TEXT, PRIMARY KEY(profile_key, key));
 CREATE TABLE metric_points (profile_key TEXT, metric_key TEXT, d TEXT, v_num REAL, v_text TEXT, src TEXT, ord INTEGER, PRIMARY KEY(profile_key, metric_key, d, ord));
 CREATE TABLE molecular (profile_key TEXT, k TEXT, v TEXT, src TEXT, state TEXT, note TEXT, ord INTEGER);
@@ -302,7 +341,19 @@ CREATE TABLE pathology_rows (profile_key TEXT, kind TEXT, a TEXT, b TEXT, ord IN
 CREATE INDEX idx_points ON metric_points(profile_key, metric_key);
 `);
 for (const [k, p] of Object.entries(DATA.profiles)) {
-  db.prepare('INSERT INTO subjects VALUES (?,?,?,?,?,?,?,?,?,?)').run(k, p.name, p.sex, p.age, p.meta, p.headline, p.stage, p.mindset, JSON.stringify(p.dash_keys), JSON.stringify(p.path));
+  /* 显式列名：subjects 在 0001_initial.sql 里比这里多 7 列（档案级标量与分节标题），
+     按位置写会因为列数不匹配直接报错。列名顺序与 schema/0001_initial.sql 一致。 */
+  db.prepare(`INSERT INTO subjects
+    (profile_key, name, sex, age, meta, headline, stage, mindset, dash_keys, path,
+     activity, family_talk, lynch_title, resect_title, stoma_json, pathology_title, pathology_status)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(k, p.name, p.sex, p.age, p.meta, p.headline, p.stage, p.mindset,
+      JSON.stringify(p.dash_keys), JSON.stringify(p.path),
+      p.activity, p.familyTalk,
+      p.lynch ? p.lynch.title : null,
+      p.resect ? p.resect.title : null,
+      p.stoma ? JSON.stringify({ type: p.stoma.type, site: p.stoma.site, date: p.stoma.date, plan: p.stoma.plan, supplies: p.stoma.supplies, thresholds: p.stoma.thresholds }) : null,
+      p.pathology.title, p.pathology.status);
   for (const m of p.metrics) {
     db.prepare('INSERT INTO metrics VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(k, m.key, m.name, m.unit, m.cat, m.color, m.dec, m.dec === null ? (m.kind || 'qual') : 'numeric', m.band ? m.band[0] : null, m.band ? m.band[1] : null, m.note);
     m.points.forEach((pt, i) => db.prepare('INSERT INTO metric_points VALUES (?,?,?,?,?,?,?)').run(k, m.key, pt.d, typeof pt.v === 'number' ? pt.v : null, typeof pt.v === 'number' ? null : pt.v, pt.src, i));
@@ -324,17 +375,23 @@ for (const [k, p] of Object.entries(DATA.profiles)) {
   p.pathology.gaps.forEach((r, i) => db.prepare('INSERT INTO pathology_rows VALUES (?,?,?,?,?)').run(k, 'gap', r[0], r[1], i));
 }
 DATA.trials.forEach(t => db.prepare('INSERT INTO trials VALUES (?,?,?,?,?,?)').run(t.id, t.title, t.phase, t.status, t.sponsor, t.url));
-[['disclaimer', '全部患者数据为虚构模拟，仅供原型演示；trials 表为真实登记摘录，状态未核实'],
- ['generated_at', new Date().toISOString()], ['source', 'demo/build-demo-data.mjs（唯一数据源）'],
- ['subjects', '2'], ['metrics_rows', String(Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.length, 0))],
- ['points_rows', String(Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.reduce((b, m) => b + m.points.length, 0), 0))]]
-  .forEach(([k, v]) => db.prepare('INSERT INTO demo_meta VALUES (?,?)').run(k, v));
+buildMeta().forEach(([k, v]) => db.prepare('INSERT INTO demo_meta VALUES (?,?)').run(k, v));
 db.close();
+}
 
 /* ---------- 产 2：原型数据层 ---------- */
-const js = '/* 由 demo/build-demo-data.mjs 生成；勿手改，改数据请改生成器后重新运行。 */\nwindow.DEMO_DATA = ' + JSON.stringify(DATA) + ';\n';
-writeFileSync(join(P2, 'demo-data.js'), js);
+function writePrototypeJs() {
+  /* 只有 profiles 与 trials 进前端快照：meta 是给 sqlite 的统计信息，前端用不到，
+     加进去会让 demo-data.js 的字节数每次运行都变（generated_at），原型快照不该这样。 */
+  const js = '/* 由 demo/build-demo-data.mjs 生成；勿手改，改数据请改生成器后重新运行。 */\nwindow.DEMO_DATA = ' + JSON.stringify(DATA) + ';\n';
+  writeFileSync(join(P2, 'demo-data.js'), js);
+}
 
-const nMetrics = Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.length, 0);
-const nPoints = Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.reduce((b, m) => b + m.points.length, 0), 0);
-console.log(`demo-data.sqlite + demo-data.js 生成完毕：2 档案 / ${nMetrics} 项指标 / ${nPoints} 个数据点 / ${DATA.trials.length} 条试验`);
+/* ---------- 只有被当作脚本直接运行时才落盘 ---------- */
+if (isDirectRun()) {
+  writeSqlite();
+  writePrototypeJs();
+  const nMetrics = Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.length, 0);
+  const nPoints = Object.values(DATA.profiles).reduce((a, p) => a + p.metrics.reduce((b, m) => b + m.points.length, 0), 0);
+  console.log(`demo-data.sqlite + demo-data.js 生成完毕：2 档案 / ${nMetrics} 项指标 / ${nPoints} 个数据点 / ${DATA.trials.length} 条试验`);
+}
