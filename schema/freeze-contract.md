@@ -7,4 +7,4 @@
 
 | 文件 | sha256 |
 | --- | --- |
-| `0001_initial.sql` | ${sha} |
+| `0001_initial.sql` | a06561ff357e1d174f8b29b84b4d275e6ad7f73486849a88607013b5a55f48e5 |

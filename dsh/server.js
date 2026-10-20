@@ -85,6 +85,23 @@ function sendFile(res, file) {
 
 /* ---------------- 路由 ---------------- */
 
+/**
+ * 把 public/ 下的文件按 urlPath 回出去（只读 GET/HEAD，路径穿越已拦）。
+ * 独立启动与 DSH 宿主两条链路共用这一份，避免"本地能开、装进 Desktop 就 404"。
+ * @returns {boolean} 是否已经写完响应
+ */
+export function servePublic(req, res, urlPath) {
+  if (req.method !== 'GET' && req.method !== 'HEAD') {
+    res.writeHead(405, { allow: 'GET, HEAD' });
+    res.end();
+    return true;
+  }
+  const file = safeJoin(PUBLIC_DIR, urlPath);
+  if (file && sendFile(res, file)) return true;
+  // 单页应用：未知路径回 index.html，交给前端按 hash 路由
+  return sendFile(res, join(PUBLIC_DIR, 'index.html'));
+}
+
 export function createHandler({ workbench }) {
   return function handle(req, res) {
     const url = new URL(req.url, `http://${req.headers.host || '127.0.0.1'}`);

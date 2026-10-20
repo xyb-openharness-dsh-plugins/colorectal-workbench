@@ -31,7 +31,10 @@ const icons = {
   folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z',
   chat: 'M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10l-6 5V5ZM8 8h8M8 11h5'
 };
-const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[k]}"/></svg>`;
+/* 看板任务卡用的是页面键（records / review / labs），图标表里叫 folder / calendar / lab；
+   这里做一次别名，避免拼错键时静默输出 d="undefined" 的空 path（控制台会报 moveto 错误）。 */
+const ICON_ALIAS = { records: 'folder', review: 'calendar', labs: 'lab', timeline: 'chart', mind: 'heart', nutrition: 'leaf', treatment: 'drip', subtype: 'badge', trials: 'flask', dashboard: 'home' };
+const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[k] || icons[ICON_ALIAS[k]] || icons.badge}"/></svg>`;
 
 const PAGES = [
   ['dashboard', '看板', 'home'], ['records', '病情整理', 'folder'], ['subtype', '我的分型', 'badge'], ['treatment', '治疗历程', 'drip'],
@@ -111,9 +114,19 @@ function sparkline(m, w = 200, h = 44) {
   const dots = pts.map((p, i) => `<circle class="sp-dot" cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="2.6" fill="${m.color}"/>`).join('');
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path class="base" d="M4 ${h - 5}H${w - 4}"/><path class="sp-line" d="${path}" stroke="${m.color}"/>${dots}</svg>`;
 }
+/* 3D 翻面（24-METRIC-TREND-TAB-DESIGN §5）：点整卡转 180°，再点返回；
+   data-flipped 是唯一的视觉开关，aria-pressed 只为兼容旧样式保留；
+   两面互换 aria-hidden，隐藏面不进读屏顺序。分类记录（data-static）不翻。 */
 function flipCard(key) {
   const el = document.querySelector(`[data-mcard="${key}"]`);
-  if (el) el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  if (!el || el.dataset.static) return;
+  const on = el.dataset.flipped !== 'true';
+  el.dataset.flipped = String(on);
+  el.setAttribute('aria-pressed', String(on));
+  const front = el.querySelector('[data-face="front"]');
+  const back = el.querySelector('[data-face="back"]');
+  if (front) front.setAttribute('aria-hidden', String(on));
+  if (back) back.setAttribute('aria-hidden', String(!on));
 }
 function mcard(key, m) {
   const last = (m.points || []).slice(-1)[0];
@@ -122,22 +135,24 @@ function mcard(key, m) {
   const d = delta(m);
   const cat = `<span class="cat"><i style="background:${m.color}"></i>${esc(m.cat)}</span>`;
   if (!numeric) {
-    return `<button class="mcard" data-mcard="${key}" data-static="1" aria-pressed="false" title="分类记录，不翻面">
-      <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
+    return `<div class="mcard" data-mcard="${key}" data-static="1" role="group" aria-roledescription="指标卡"
+      aria-label="${esc(m.name)}：${esc(String(last.v))}（分类记录，只按原文记录，不连折线）">
+      <span class="mface front" data-face="front">${cat}<span class="name">${esc(m.name)}</span>
       <span class="na">${esc(last.v)}</span>
-      <span class="meta"><span>${esc(last.src)}</span><span class="hint">分类记录</span></span></span></button>`;
+      <span class="meta"><span>${esc(last.src)}</span><span class="hint">分类记录</span></span></span></div>`;
   }
   const band = m.band ? `<span class="rec">参考 ${m.band[0]}–${m.band[1]} ${esc(m.unit)}</span>` : `<span class="rec">${esc(last.d)} · ${esc(last.src)}</span>`;
-  return `<button class="mcard" data-mcard="${key}" aria-pressed="false" onclick="flipCard('${key}')" title="轻点翻面看参考区间与说明">
+  return `<div class="mcard" role="group" tabindex="0" data-mcard="${key}" data-flipped="false" aria-roledescription="指标卡"
+    aria-label="${esc(m.name)} 最近 ${last.v.toFixed(m.dec ?? 1)} ${esc(m.unit)}（${esc(last.d)}）；点一下翻面看趋势">
     <span class="mcard-inner">
-    <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
+    <span class="mface front" data-face="front">${cat}<span class="name">${esc(m.name)}</span>
       <span class="val"><span data-countup="${last.v}" data-dec="${m.dec ?? 1}">${last.v.toFixed(m.dec ?? 1)}</span><small>${esc(m.unit)}</small></span>
       ${d ? `<span class="delta">较上次 <em>${d.text}${m.unit ? ' ' + esc(m.unit) : ''}</em>（${esc(d.from)}）</span>` : ''}
       ${band}</span>
-    <span class="mface back">${cat}<span class="name">${esc(m.name)}</span>
+    <span class="mface back" data-face="back" aria-hidden="true">${cat}<span class="name">${esc(m.name)}</span>
       ${sparkline(m, 190, 40)}
       <span class="meta"><span>${esc(m.note)}</span><span class="hint">轻点翻回</span></span></span>
-    </span></button>`;
+    </span></div>`;
 }
 /* ---------------- 一图秀引擎（统一画布 · 多序列归一化 · 移植淋巴瘤基因） ---------------- */
 const CW = 980, CH = 420, CX0 = 62, CX1 = 954, CY0 = 132, CY1 = 366;
@@ -316,7 +331,7 @@ function vDashboard() {
   const cards = (DASH_KEYS[state.profile] || []).filter(k => m[k]).map(k => mcard(k, m[k])).join('');
   return `<div class="page-enter">${pageHead()}
   <div class="hero"><div><span class="eyebrow">当前情况</span><h1>${esc(p.headline)}</h1><p>${esc(p.mindset)}</p>
-    <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button><button class="soft" data-action="agent-open">${icon('chat')}AI 对话</button></div></div>
+    <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button><button class="soft hero-ai" data-action="agent-open">${icon('chat')}AI 对话</button></div></div>
     <div class="hero-mascot" aria-hidden="true"><span style="font-size:56px">🫂</span></div></div>
   ${alertNext}
   <div class="intent"><i>✓</i><span>工作台只做<b>记录与整理</b>；诊断、方案调整由医生决定。页面里全部资料为<b>演示数据</b>。</span></div>
@@ -857,6 +872,8 @@ document.addEventListener('click', (e) => {
   }
   const pp = e.target.closest('[data-pick-profile]');
   if (pp) { state.profile = pp.dataset.pickProfile; state.sel = defaultSel(pp.dataset.pickProfile); state.pin = null; closeDialog(); render(); toast(`已切换到 ${P().name}的资料（演示）`); return; }
+  const card = e.target.closest('.mcard[data-mcard]');
+  if (card && !card.dataset.static) { flipCard(card.dataset.mcard); return; }
   const act = e.target.closest('[data-action]')?.dataset.action;
   if (!act) return;
   const map = {
@@ -965,7 +982,11 @@ document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-action]');
   if (el && el.dataset.action === 'zoom') { state.zoom = Number(el.value); render(); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#dialog').open) closeDialog(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#dialog').open) { closeDialog(); return; }
+  const card = e.target.closest && e.target.closest('.mcard[data-mcard]:not([data-static])');
+  if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); flipCard(card.dataset.mcard); }
+});
 $('#font-toggle').addEventListener('click', () => { const on = document.body.classList.toggle('large'); $('#font-toggle').setAttribute('aria-pressed', String(on)); });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== state.view && VIEWS[v]) { state.view = v; render(); } });
 

@@ -64,7 +64,11 @@ test('④ 读模型形状：指标点按 ord 排序、数值是数字、分类�
   const cea = p.metrics.find((m) => m.key === 'cea');
   assert.ok(cea.points.length >= 4);
   assert.equal(typeof cea.points[0].v, 'number', '数值指标读出来必须是数字');
-  assert.equal(cea.points[0].d, '2026-08-10', '首个点应是插入顺序的第一条');
+  const ceaDates = cea.points.map((pt) => pt.d);
+  assert.deepEqual(ceaDates, [...ceaDates].sort(), '指标点必须按采样日期升序');
+  /* 需求：演示数据要覆盖 6 个月（见 docs/DEV-REQUIREMENTS-2026-10-20.md 第 2 条） */
+  const spanDays = (new Date(ceaDates.at(-1)) - new Date(ceaDates[0])) / 86400000;
+  assert.ok(spanDays >= 150, `CEA 序列应覆盖 >=150 天（6 个月演示窗口），实际 ${Math.round(spanDays)} 天`);
   const neuro = p.metrics.find((m) => m.key === 'neuro' || m.kind === 'grade');
   if (neuro) assert.equal(typeof neuro.points[0].v, 'string', '分类指标读出来是原文本');
   assert.ok(p.docs.length >= 1 && p.candidates.length >= 1, '病情整理用的 docs/candidates 要带出来');

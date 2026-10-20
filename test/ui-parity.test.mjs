@@ -274,9 +274,9 @@ test('⑧ 原型四个既有校验脚本依赖的导出仍可用（shim 不抛�
 /* 顶栏三段式 + AI 按钮五态：逐条对照 prompts/DSH-WORKBENCH-TOP-BAR.md 的硬约束。
    目的：把「顶栏结构」从肉眼检查变成断言——左区不许出现按钮、中区必须 flex:1、
    按钮组必须 margin-left:auto、五态文案一个都不能自造。 */
-test('⑨ 顶栏三段式与 AI 按钮五态（对照 DSH-WORKBENCH-TOP-BAR 提示词）', () => {
+test('⑨ 顶栏三段式、AI 按钮五态与面板宽度（对照 DSH-WORKBENCH-TOP-BAR / 20-AGENT-PANE-DESIGN）', () => {
   const html = read(path.join(PUBLIC_DIR, 'index.html'));
-  const css = read(path.join(PUBLIC_DIR, 'topbar.css'));
+  const css = read(path.join(PUBLIC_DIR, 'shell.css'));
   const app = read(path.join(PUBLIC_DIR, 'app.js'));
 
   // 1) 三段顺序：品牌区 → 说明 → 操作组
@@ -315,6 +315,46 @@ test('⑨ 顶栏三段式与 AI 按钮五态（对照 DSH-WORKBENCH-TOP-BAR 提�
   // 7) 收起 ≠ 结束会话：状态机里 open → closed 只切显隐
   assert.match(app, /if \(ph === 'open'\) \{ state\.agentPhase = 'closed'; renderAgent\(\); return; \}/,
     '展开态点主按钮应转为 closed（只收起，不结束会话）');
+
+  // 8) 面板宽度可调：分隔条存在、有 role=separator 与数值区间，宽度来自 lib/layout.js 单一来源
+  assert.match(html, /id="agent-splitter"[^>]*role="separator"[^>]*aria-valuemin="25"[^>]*aria-valuemax="45"/,
+    '分隔条必须 role=separator 且 aria-valuemin/max 为 25/45');
+  assert.match(html, /id="agent-splitter"[^>]*tabindex="0"/, '分隔条要能被键盘聚焦');
+  assert.match(css, /\.work-grid\.agent-open\{grid-template-columns:minmax\(0,1fr\) 10px var\(--agent-w/,
+    '展开态必须是三列：业务区 | 分隔条 | 面板（宽度用 --agent-w）');
+  assert.match(app, /let AGENT_PANE = \{ min: 0\.25, max: 0\.45, def: 0\.35/, '客户端兜底区间要与 lib/layout.js 一致');
+  assert.match(app, /state\.agentRatio/, '宽度要按比例存在 state 里，不能写死像素');
+  assert.match(app, /localStorage\.setItem\(AGENT_STORE_KEY/, '宽度要记忆（下次打开同一档）');
+  assert.match(app, /addEventListener\('pointerdown'/, '分隔条要能鼠标拖动');
+  assert.match(app, /e\.key === 'ArrowLeft'[\s\S]{0,240}e\.key === 'ArrowRight'/, '分隔条要支持 ←/→ 键盘调宽');
+  // 布局参数唯一来源：lib/layout.js 里的区间下限/上限与客户端兜底一致
+  const layoutSrc = read(path.join(ROOT, 'lib', 'layout.js'));
+  assert.match(layoutSrc, /export const AGENT_PANE/, 'lib/layout.js 必须导出 AGENT_PANE（唯一来源）');
+  assert.match(layoutSrc, /min: 0\.25,\s*\n\s*max: 0\.45,/, 'lib/layout.js 的区间应为 0.25–0.45');
+});
+
+test('⑩ 客户端注册参数与 lib/layout.js 同源、UI 前缀与 dsh/index.js 一致', () => {
+  const client = read(path.join(ROOT, 'lib', 'client.js'));
+  const layoutSrc = read(path.join(ROOT, 'lib', 'layout.js'));
+  const indexSrc = read(path.join(ROOT, 'dsh', 'index.js'));
+  const appSrc = read(path.join(PUBLIC_DIR, 'app.js'));
+
+  // 1) 宿主注册的三个参数，客户端字面量必须等于 lib/layout.js 的 PANEL
+  const panel = layoutSrc.slice(layoutSrc.indexOf('export const PANEL'), layoutSrc.indexOf('export const HOST_LIMITS'));
+  const side = panel.match(/businessSide:\s*'([a-z]+)'/)?.[1];
+  const width = panel.match(/businessWidth:\s*([\d.]+)/)?.[1];
+  const custom = panel.match(/customFrame:\s*(true|false)/)?.[1];
+  assert.ok(side && width && custom, 'lib/layout.js 的 PANEL 必须写全三项');
+  assert.match(client, new RegExp(`businessSide:\\s*'${side}'`), `客户端 businessSide 必须等于 ${side}`);
+  assert.match(client, new RegExp(`businessWidth:\\s*${width.replace('.', '\\.')}`), `客户端 businessWidth 必须等于 ${width}`);
+  assert.match(client, new RegExp(`customFrame:\\s*${custom}`), `客户端 customFrame 必须等于 ${custom}`);
+
+  // 2) 接口前缀只在 dsh/index.js 写一次，前端按同一份约定推基址
+  const apiPrefix = indexSrc.match(/export const API_PREFIX = '([^']+)'/)?.[1];
+  assert.ok(apiPrefix, 'dsh/index.js 必须导出 API_PREFIX');
+  assert.match(indexSrc, /const UI_PREFIX = `\$\{API_PREFIX\}\/ui`/, 'UI 前缀必须由 API 前缀拼出来');
+  assert.ok(appSrc.includes(`'${apiPrefix}/ui'`), `public/app.js 的 apiBase() 必须认 ${apiPrefix}/ui`);
+  assert.ok(client.includes(`${apiPrefix}/ui/index.html`), '客户端 iframe 必须指向本包自己的 UI 前缀');
 });
 
 test.after(() => {

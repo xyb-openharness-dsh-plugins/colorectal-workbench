@@ -16,8 +16,8 @@
 <meta name="robots" content="noindex">
 <title>小畅宝 Colopal · 结直肠癌工作台 v0.1.0</title>
 <link rel="stylesheet" href="style.css">
-<!-- 顶栏三段式是开发版新增（原型没有），单独成文件，避免打乱 style.css 与定稿原型的逐行对齐 -->
-<link rel="stylesheet" href="topbar.css">
+<!-- 顶栏三段式与 AI 面板分栏是开发版新增（原型没有），单独成文件 shell.css，避免打乱 style.css 与定稿原型的逐行对齐 -->
+<link rel="stylesheet" href="shell.css">
 </head>
 <body>
 <a class="skip" href="#main">跳到主要内容</a>
@@ -39,7 +39,8 @@
          右＝主操作组（margin-left:auto 贴右缘，AI 对话是这一条唯一的强色块）。 -->
     <header class="topbar">
       <div class="tb-brand">
-        <div class="breadcrumb">小畅宝工作台 <span>/</span> <b id="breadcrumb">看板</b></div>
+        <span class="tb-name">小畅宝工作台</span>
+        <span class="breadcrumb"><span>/</span><b id="breadcrumb">看板</b></span>
         <button class="tb-ver" id="ver-chip" data-action="about" aria-label="关于小畅宝：查看版本号与构建信息">v0.1.0</button>
       </div>
       <p class="tb-hint" id="top-hint">点「AI 对话」打开右侧会话面板；× 只是收起，不会结束会话。</p>
@@ -53,6 +54,10 @@
     </header>
     <div class="work-grid" id="work-grid">
       <main id="main" tabindex="-1"></main>
+      <!-- 分隔条：只有面板展开时可拖/可 Tab；鼠标拖动或 ←/→ 调整 25%–45%，松手记忆 -->
+      <div class="agent-splitter" id="agent-splitter" role="separator" aria-orientation="vertical"
+           aria-label="调整 AI 会话面板宽度" aria-valuemin="25" aria-valuemax="45" aria-valuenow="35"
+           aria-valuetext="会话面板占 35%" title="拖动调整宽度（25%–45%）" tabindex="0" hidden></div>
       <aside class="agent-dock" id="agent-dock" aria-label="AI 原生会话面板" hidden>
         <div class="agent-head">
           <span class="dot" id="agent-dot"></span><b>AI 对话</b>

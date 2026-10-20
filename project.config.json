@@ -1,7 +1,7 @@
 {
   "packageName": "@xyb-community/colorectal-workbench",
-  "title": "小畅宝 Colopal 结直肠癌工作台（品牌占位）",
-  "repository": "https://github.com/xyb-community/colorectal-workbench",
+  "title": "小畅宝 Colopal 结直肠癌工作台",
+  "repository": "https://github.com/xyb-openharness-dsh-plugins/colorectal-workbench",
   "description": "本机优先的结直肠癌分子分型、肠道功能与造口护理、治疗历程与复诊准备工作台",
   "slug": "colorectal",
   "targetUsers": "结直肠癌（结肠癌、直肠癌）患者及照护者；不含肛管肿瘤（归小萌宝）",

@@ -44,7 +44,10 @@ const icons = {
   folder: 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z',
   chat: 'M4 5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H10l-6 5V5ZM8 8h8M8 11h5'
 };
-const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[k]}"/></svg>`;
+/* 看板任务卡用的是页面键（records / review / labs），图标表里叫 folder / calendar / lab；
+   这里做一次别名，避免拼错键时静默输出 d="undefined" 的空 path（控制台会报 moveto 错误）。 */
+const ICON_ALIAS = { records: 'folder', review: 'calendar', labs: 'lab', timeline: 'chart', mind: 'heart', nutrition: 'leaf', treatment: 'drip', subtype: 'badge', trials: 'flask', dashboard: 'home' };
+const icon = (k) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${icons[k] || icons[ICON_ALIAS[k]] || icons.badge}"/></svg>`;
 
 const PAGES = [
   ['dashboard', '看板', 'home'], ['records', '病情整理', 'folder'], ['subtype', '我的分型', 'badge'], ['treatment', '治疗历程', 'drip'],
@@ -81,10 +84,18 @@ const SUBTITLES = {
 /* ---------------- 数据层（开发版：后端 GET /api/bootstrap；结构与原型 demo-data.js 一致） ----------------
    原型这里是 `const D = window.DEMO_DATA;` + 顶层同步构建；开发版把同样的构建过程收进 buildData(D)，
    由 loadBootstrap() 拿到数据后再调用。循环体保持原型的原始缩进不重排，便于逐行 diff。 */
+/* 接口基址：独立启动（页面在 `/`）是空串；装进 Desktop 后页面在
+   `/api/colorectal/ui/`，接口前缀就是 `/api/colorectal`。
+   约定的名字只在 dsh/index.js 的 API_PREFIX 出现一次，改那边要同步这里。 */
+function apiBase() {
+  const path = (typeof location !== 'undefined' && location.pathname) || '';
+  return path.indexOf('/api/colorectal/ui') === 0 ? '/api/colorectal' : '';
+}
 function loadBootstrap() {
   const fallback = (typeof window !== 'undefined' && window.DEMO_DATA) || null;
+  const endpoint = `${apiBase()}/api/bootstrap`;
   let p;
-  try { p = fetch('/api/bootstrap'); } catch (e) { p = Promise.reject(e); }
+  try { p = fetch(endpoint); } catch (e) { p = Promise.reject(e); }
   return Promise.resolve(p)
     .then((r) => {
       if (!r || r.ok === false) throw new Error('bootstrap 响应不可用' + (r && r.status ? `（HTTP ${r.status}）` : ''));
@@ -117,6 +128,11 @@ for (const [k, p] of Object.entries(D.profiles)) {
 }
 /* 原型：const TRIALS = D.trials;（顶层 const）。开发版改为在函数内赋值，并同步后端版本号。 */
   TRIALS = D.trials || [];
+  /* 面板宽度参数以接口为准（唯一来源 lib/layout.js）；没给就保留兜底值。 */
+  if (D.layout && D.layout.agentPane) {
+    AGENT_PANE = { ...AGENT_PANE, ...D.layout.agentPane };
+    state.agentRatio = AGENT_PANE.def;
+  }
   /* 宿主未提供原生会话时（bootstrap 显式声明 agent.available=false），主按钮进 unavailable 态：
      禁用 + 说明降级原因，绝不自建聊天框（交互合同 20 号：缺位时走剪贴板回退）。 */
   if (D.agent && D.agent.available === false) {
@@ -136,13 +152,17 @@ const AGENT_LABEL = { idle: 'AI 对话', connecting: '正在连接…', open: '�
 const AGENT_HINT = {
   idle: '点「AI 对话」打开右侧会话面板；× 只是收起，不会结束会话。',
   connecting: '正在调起会话…（此时按钮禁用，避免重复创建）。',
-  open: '右侧会话面板可用「窄 / 标准 / 宽」调整宽度；× 只是收起，不会结束会话。',
+  open: '可拖动中间那条分隔条调整面板宽度（25%–45%），键盘 ←/→ 也行；× 只是收起，不会结束会话。',
   closed: '会话还在，点「打开 AI 对话」回到刚才那一段；不会重新开始。',
   unavailable: '宿主没有提供原生会话：可用面板里的「整理本页要点」复制提示词，粘贴到会话里发送。'
 };
 
 /* ---------------- state ---------------- */
-const state = { view: 'dashboard', profile: 'A', agentPhase: 'idle', agentSize: 'std', sel: ['cea', 'ca199', 'wt'],
+/* 面板宽度区间来自 bootstrap 的 layout.agentPane（唯一来源 lib/layout.js）；
+   接口没给时用同一组数字兜底，保证离线/回退路径也能拖动。 */
+let AGENT_PANE = { min: 0.25, max: 0.45, def: 0.35, step: 24, presets: { narrow: 0.25, std: 0.35, wide: 0.45 } };
+const AGENT_STORE_KEY = 'xyb-colorectal-agent-ratio';
+const state = { view: 'dashboard', profile: 'A', agentPhase: 'idle', agentSize: 'std', agentRatio: AGENT_PANE.def, sel: ['cea', 'ca199', 'wt'],
   range: 'all', zoom: 100, toggles: { treatment: true, keypoints: true }, pin: null, saved: [], sub: {},
   query: '', parsing: false, parseError: false, loaded: {}, parsingName: '', lastUpload: null, uploads: 0 };
 const defaultSel = (k) => (DASH_KEYS[k] || []).filter(c => { const m = METRICS[k][c]; return m && typeof m.points.find(p => typeof p.v === 'number')?.v === 'number'; }).slice(0, 3);
@@ -169,9 +189,19 @@ function sparkline(m, w = 200, h = 44) {
   const dots = pts.map((p, i) => `<circle class="sp-dot" cx="${X(i).toFixed(1)}" cy="${Y(p.v).toFixed(1)}" r="2.6" fill="${m.color}"/>`).join('');
   return `<svg class="spark" viewBox="0 0 ${w} ${h}" aria-hidden="true"><path class="base" d="M4 ${h - 5}H${w - 4}"/><path class="sp-line" d="${path}" stroke="${m.color}"/>${dots}</svg>`;
 }
+/* 3D 翻面（24-METRIC-TREND-TAB-DESIGN §5）：点整卡转 180°，再点返回；
+   data-flipped 是唯一的视觉开关，aria-pressed 只为兼容旧样式保留；
+   两面互换 aria-hidden，隐藏面不进读屏顺序。分类记录（data-static）不翻。 */
 function flipCard(key) {
   const el = document.querySelector(`[data-mcard="${key}"]`);
-  if (el) el.setAttribute('aria-pressed', el.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+  if (!el || el.dataset.static) return;
+  const on = el.dataset.flipped !== 'true';
+  el.dataset.flipped = String(on);
+  el.setAttribute('aria-pressed', String(on));
+  const front = el.querySelector('[data-face="front"]');
+  const back = el.querySelector('[data-face="back"]');
+  if (front) front.setAttribute('aria-hidden', String(on));
+  if (back) back.setAttribute('aria-hidden', String(!on));
 }
 function mcard(key, m) {
   const last = (m.points || []).slice(-1)[0];
@@ -180,22 +210,24 @@ function mcard(key, m) {
   const d = delta(m);
   const cat = `<span class="cat"><i style="background:${m.color}"></i>${esc(m.cat)}</span>`;
   if (!numeric) {
-    return `<button class="mcard" data-mcard="${key}" data-static="1" aria-pressed="false" title="分类记录，不翻面">
-      <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
+    return `<div class="mcard" data-mcard="${key}" data-static="1" role="group" aria-roledescription="指标卡"
+      aria-label="${esc(m.name)}：${esc(String(last.v))}（分类记录，只按原文记录，不连折线）">
+      <span class="mface front" data-face="front">${cat}<span class="name">${esc(m.name)}</span>
       <span class="na">${esc(last.v)}</span>
-      <span class="meta"><span>${esc(last.src)}</span><span class="hint">分类记录</span></span></span></button>`;
+      <span class="meta"><span>${esc(last.src)}</span><span class="hint">分类记录</span></span></span></div>`;
   }
   const band = m.band ? `<span class="rec">参考 ${m.band[0]}–${m.band[1]} ${esc(m.unit)}</span>` : `<span class="rec">${esc(last.d)} · ${esc(last.src)}</span>`;
-  return `<button class="mcard" data-mcard="${key}" aria-pressed="false" onclick="flipCard('${key}')" title="轻点翻面看参考区间与说明">
+  return `<div class="mcard" role="group" tabindex="0" data-mcard="${key}" data-flipped="false" aria-roledescription="指标卡"
+    aria-label="${esc(m.name)} 最近 ${last.v.toFixed(m.dec ?? 1)} ${esc(m.unit)}（${esc(last.d)}）；点一下翻面看趋势">
     <span class="mcard-inner">
-    <span class="mface front">${cat}<span class="name">${esc(m.name)}</span>
+    <span class="mface front" data-face="front">${cat}<span class="name">${esc(m.name)}</span>
       <span class="val"><span data-countup="${last.v}" data-dec="${m.dec ?? 1}">${last.v.toFixed(m.dec ?? 1)}</span><small>${esc(m.unit)}</small></span>
       ${d ? `<span class="delta">较上次 <em>${d.text}${m.unit ? ' ' + esc(m.unit) : ''}</em>（${esc(d.from)}）</span>` : ''}
       ${band}</span>
-    <span class="mface back">${cat}<span class="name">${esc(m.name)}</span>
+    <span class="mface back" data-face="back" aria-hidden="true">${cat}<span class="name">${esc(m.name)}</span>
       ${sparkline(m, 190, 40)}
       <span class="meta"><span>${esc(m.note)}</span><span class="hint">轻点翻回</span></span></span>
-    </span></button>`;
+    </span></div>`;
 }
 /* ---------------- 一图秀引擎（统一画布 · 多序列归一化 · 移植淋巴瘤基因） ---------------- */
 const CW = 980, CH = 420, CX0 = 62, CX1 = 954, CY0 = 132, CY1 = 366;
@@ -374,7 +406,7 @@ function vDashboard() {
   const cards = (DASH_KEYS[state.profile] || []).filter(k => m[k]).map(k => mcard(k, m[k])).join('');
   return `<div class="page-enter">${pageHead()}
   <div class="hero"><div><span class="eyebrow">当前情况</span><h1>${esc(p.headline)}</h1><p>${esc(p.mindset)}</p>
-    <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button><button class="soft" data-action="agent-open">${icon('chat')}AI 对话</button></div></div>
+    <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button><button class="soft hero-ai" data-action="agent-open">${icon('chat')}AI 对话</button></div></div>
     <div class="hero-mascot" aria-hidden="true"><span style="font-size:56px">🫂</span></div></div>
   ${alertNext}
   <div class="intent"><i>✓</i><span>工作台只做<b>记录与整理</b>；诊断、方案调整由医生决定。页面里全部资料为<b>演示数据</b>。</span></div>
@@ -755,7 +787,8 @@ function vRecords() {
 const VIEWS = { dashboard: vDashboard, records: vRecords, subtype: vSubtype, treatment: vTreatment, stoma: vStoma, labs: vLabs, timeline: vTimeline, nutrition: vNutrition, mind: vMind, review: vReview, trials: vTrials };
 
 /* ---------------- agent dock（dsh 原生会话挂载位） ---------------- */
-const FORBIDDEN = ['建议治疗', '可能复发', '预后良好', '治愈率', '可以停药', '无需就医', '推荐方案', '生存率'];
+/* 词表本身要出现这些词才能扫描，故放行：wording-allow —— 这是自检清单，不是对用户说的话。 */
+const FORBIDDEN = ['建议治疗', '可能复发', '预后良好', '治愈率', '可以停药', '无需就医', '推荐方案', '生存率']; // wording-allow
 const PAGE_CONTEXT = {
   dashboard: () => ({ facts: [`${P().name}：${P().headline}`, '监测节奏卡按分期取值并标注 NCCN 2025 / CSCO 2025 来源'], missing: ['RAS / BRAF / HER2 / PIK3CA 未检测（A 档案）', '下次 CT 具体日期'] }),
   subtype: () => ({ facts: P().molecular.map(x => `${x.k}：${x.v}（${x.src}）`), missing: P().molecular.filter(x => x.state === 'na').map(x => `${x.k} 检测状态`) }),
@@ -780,12 +813,96 @@ function mockReply() {
   return '根据你整理的本页事实：这些记录显示治疗在按计划推进，监测节奏也有依据。你提到的未确认事项（未检测标志物、下次影像日期），适合在下次门诊清单里逐条向医生确认。本回复不构成医疗建议。';
 }
 const agentOpen = () => state.agentPhase === 'open';
+
+/* ---------------- 面板宽度：拖动分隔条 / 键盘 / 窄标准宽 / 记忆 ----------------
+   比例存在 state.agentRatio（占工作区宽度），渲染时换算成像素写进 CSS 变量 --agent-w。
+   宽度数字只有 AGENT_PANE 一份（接口下发，兜底值同源 lib/layout.js），客户端不再写死 380/500。 */
+function clampRatio(r) {
+  const n = Number(r);
+  if (!Number.isFinite(n)) return AGENT_PANE.def;
+  return Math.min(AGENT_PANE.max, Math.max(AGENT_PANE.min, n));
+}
+function readStoredRatio() {
+  try {
+    const v = Number(localStorage.getItem(AGENT_STORE_KEY));
+    return Number.isFinite(v) && v > 0 ? clampRatio(v) : null;
+  } catch { return null; }
+}
+function storeRatio(r) {
+  try { localStorage.setItem(AGENT_STORE_KEY, String(r)); } catch { /* 隐私模式/禁存：不影响本次会话 */ }
+}
+function gridWidth() {
+  const g = $('#work-grid');
+  const rect = g && typeof g.getBoundingClientRect === 'function' ? g.getBoundingClientRect() : null;
+  return rect && rect.width ? rect.width : 0;
+}
+function applyAgentWidth() {
+  const grid = $('#work-grid'), sp = $('#agent-splitter');
+  if (!grid) return;
+  const ratio = clampRatio(state.agentRatio);
+  const total = gridWidth();
+  /* 宽度未知（首帧/无布局的测试环境）时按 1000px 基准换算，保证变量仍是合法像素值 */
+  grid.style.setProperty('--agent-w', `${Math.round((total || 1000) * ratio)}px`);
+  if (sp) {
+    sp.setAttribute('aria-valuenow', String(Math.round(ratio * 100)));
+    sp.setAttribute('aria-valuetext', `会话面板占 ${Math.round(ratio * 100)}%`);
+  }
+  $$('.agent-sizes button').forEach((b) => {
+    const want = AGENT_PANE.presets ? AGENT_PANE.presets[b.dataset.size] : null;
+    b.setAttribute('aria-pressed', String(want !== null && want !== undefined && Math.abs(want - ratio) < 0.02));
+  });
+}
+function setAgentRatio(r, persist = true) {
+  state.agentRatio = clampRatio(r);
+  if (persist) storeRatio(state.agentRatio);
+  applyAgentWidth();
+}
+function initSplitter() {
+  const sp = $('#agent-splitter'), grid = $('#work-grid');
+  if (!sp || !grid || typeof sp.addEventListener !== 'function') return;
+  const onMove = (e) => {
+    const rect = typeof grid.getBoundingClientRect === 'function' ? grid.getBoundingClientRect() : null;
+    if (!rect || !rect.width) return;
+    setAgentRatio((rect.right - e.clientX) / rect.width, false);   // 拖动中不写 localStorage，松手再存
+  };
+  const stop = () => {
+    if (typeof document.removeEventListener === 'function') {
+      document.removeEventListener('pointermove', onMove);
+      document.removeEventListener('pointerup', stop);
+    }
+    if (grid.classList) grid.classList.remove('agent-dragging');
+    if (document.body && document.body.classList) document.body.classList.remove('agent-dragging');
+    storeRatio(state.agentRatio);
+  };
+  sp.addEventListener('pointerdown', (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (typeof e.preventDefault === 'function') e.preventDefault();
+    if (grid.classList) grid.classList.add('agent-dragging');
+    if (document.body && document.body.classList) document.body.classList.add('agent-dragging');
+    if (typeof document.addEventListener === 'function') {
+      document.addEventListener('pointermove', onMove);
+      document.addEventListener('pointerup', stop);
+    }
+  });
+  sp.addEventListener('keydown', (e) => {
+    const step = (AGENT_PANE.step || 24) / (gridWidth() || 1000);
+    if (e.key === 'ArrowLeft') { e.preventDefault(); setAgentRatio(state.agentRatio + step); }        // 面板变宽
+    else if (e.key === 'ArrowRight') { e.preventDefault(); setAgentRatio(state.agentRatio - step); }   // 面板变窄
+    else if (e.key === 'Home') { e.preventDefault(); setAgentRatio(AGENT_PANE.min); }
+    else if (e.key === 'End') { e.preventDefault(); setAgentRatio(AGENT_PANE.max); }
+  });
+  /* 窗口变宽变窄后按同一比例重算像素，避免面板吃掉整个业务区 */
+  if (typeof window.addEventListener === 'function') window.addEventListener('resize', () => { if (agentOpen()) applyAgentWidth(); });
+}
+
 function renderAgent() {
   const dock = $('#agent-dock'), grid = $('#work-grid'), btn = $('#agent-toggle');
   const ph = state.agentPhase, open = ph === 'open';
   dock.hidden = !open;
   grid.classList.toggle('agent-open', open);
-  grid.classList.toggle('agent-wide', open && state.agentSize === 'wide');
+  const sp = $('#agent-splitter');
+  if (sp) sp.hidden = !open;          // 分隔条只在面板展开时可拖
+  if (open) applyAgentWidth();
   const label = AGENT_LABEL[ph] || AGENT_LABEL.idle;
   if (btn) {
     btn.setAttribute('aria-expanded', String(open));
@@ -798,7 +915,6 @@ function renderAgent() {
   const hide = $('#agent-hide'); if (hide) hide.hidden = !open;         // × 只在展开时出现
   const hint = $('#top-hint'); if (hint) hint.textContent = AGENT_HINT[ph] || AGENT_HINT.idle;
   const dot2 = $('#agent-dot'); if (dot2) dot2.classList.toggle('on', open);
-  $$('.agent-sizes button').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.size === state.agentSize)));
   const body = $('#agent-body');
   if (!body.dataset.built) {
     body.innerHTML = `<div class="agent-note"><b>dsh 原生会话挂载位</b><br>原生会话仅在 DSH Desktop 内可用；当前为浏览器预览，这里保留宿主会话的挂载点（#dsh-conversation-slot），不模拟聊天窗口。</div>
@@ -941,6 +1057,8 @@ document.addEventListener('click', (e) => {
   }
   const pp = e.target.closest('[data-pick-profile]');
   if (pp) { state.profile = pp.dataset.pickProfile; state.sel = defaultSel(pp.dataset.pickProfile); state.pin = null; closeDialog(); render(); toast(`已切换到 ${P().name}的资料（演示）`); return; }
+  const card = e.target.closest('.mcard[data-mcard]');
+  if (card && !card.dataset.static) { flipCard(card.dataset.mcard); return; }
   const act = e.target.closest('[data-action]')?.dataset.action;
   if (!act) return;
   const map = {
@@ -1028,7 +1146,12 @@ document.addEventListener('click', (e) => {
     'agent-build': agentBuild,
     'agent-demo': agentDemo
   };
-  if (act === 'agent-size') { state.agentSize = e.target.closest('[data-action]').dataset.size; renderAgent(); return; }
+  if (act === 'agent-size') {
+    const size = e.target.closest('[data-action]').dataset.size;
+    const want = AGENT_PANE.presets ? AGENT_PANE.presets[size] : null;
+    if (want) { state.agentSize = size; setAgentRatio(want); }
+    return;
+  }
   if (act === 'cfg-tab') {
     const el = e.target.closest('[data-action]');
     document.querySelectorAll('.cfg-tabs [role=tab]').forEach((b) => b.setAttribute('aria-selected', String(b === el)));
@@ -1049,7 +1172,11 @@ document.addEventListener('change', (e) => {
   const el = e.target.closest('[data-action]');
   if (el && el.dataset.action === 'zoom') { state.zoom = Number(el.value); render(); }
 });
-document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && $('#dialog').open) closeDialog(); });
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && $('#dialog').open) { closeDialog(); return; }
+  const card = e.target.closest && e.target.closest('.mcard[data-mcard]:not([data-static])');
+  if (card && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); flipCard(card.dataset.mcard); }
+});
 $('#font-toggle').addEventListener('click', () => { const on = document.body.classList.toggle('large'); $('#font-toggle').setAttribute('aria-pressed', String(on)); });
 window.addEventListener('hashchange', () => { const v = location.hash.slice(1); if (v && v !== state.view && VIEWS[v]) { state.view = v; render(); } });
 
@@ -1065,6 +1192,10 @@ function init() {
 const initialHash = location.hash.slice(1);
 if (VIEWS[initialHash]) state.view = initialHash;
 applyVersion();
+/* 面板宽度：上次拖到/选到的比例优先，默认 35%（layout.js 的 def） */
+const remembered = readStoredRatio();
+if (remembered) state.agentRatio = remembered;
+initSplitter();
 render();
 }
 /* 数据彻底拿不到时，#main 给出明确说明，不留白屏 */
