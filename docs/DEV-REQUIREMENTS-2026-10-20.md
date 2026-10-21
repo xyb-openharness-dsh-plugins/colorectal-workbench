@@ -4,7 +4,7 @@
 
 | # | 要求 | 做什么 | 怎么验 |
 | --- | --- | --- | --- |
-| 1 | tar 包登记目标必须是 **desktop**，不是 web | `dsh.client.platform` 按官方检查器要求保持 `"web"`（指客户端运行环境）；**装机目录**固定 `~/.dsh/profiles/desktop`，并写进该 profile 的 `dsh.profile.bundles` | `node scripts/check-install.mjs`：desktop 的 dependencies + bundles 都有本包才返回 0；只装在 web 会报错并给出正确命令 |
+| 1 | tar 包登记目标必须是 **Desktop 实际加载的 Harness profile**（2026-10-21 更正：原写"固定 `~/.dsh/profiles/desktop`"是错的——那是 CLI 侧的 desktop profile，Desktop 不读） | `dsh.client.platform` 按官方检查器要求保持 `"web"`（指客户端运行环境，与装机目录无关）；装机目录＝Desktop 自己 Harness 的活动 profile，本机为 `~/Library/Application Support/dsh-desktop/harness/profiles/web`，并写进**那个** profile 的 `dsh.profile.bundles` | `node scripts/check-install.mjs`：自动探测基准目录，dependencies + bundles 都有本包才返回 0；装在别处会报错并打印本机正确命令 |
 | 2 | 保留 **2 套模拟数据**，时间跨度 **6 个月** | A 陈先生（ⅢB / dMMR / 临时回肠造口）、B 王女士（Ⅳ 期 / KRAS G12D / 转化治疗），都覆盖 2026-04-20 → 2026-10-18；化验/体征每 2–4 周一点，影像按真实频率 | `test/store.test.mjs` ③ parity（库 ↔ demo-data.js 逐字段一致）+ 档案切换后看板/一图秀都能渲染 |
 | 3 | **一图秀严格按设计原型** | 统一画布常量、单调三次插值、每指标独立配色、治疗泳道与评估标记、末点防叠字、缩放 40–100%、pin 详情，逐项与原型一致 | `test/ui-parity.test.mjs` ① 逐视图比 HTML（含 timeline 全子页签 × 2 档案）；配色/无过冲另由 `/tmp/check-monotone.mjs` 一类专项脚本守 |
 | 4 | 首页右上角控制区 **严格按 starter 设计**；AI 按钮可 **打开 / 隐藏 / 调宽** | 顶栏三段式（左定位＝品牌+版本 chip、中一句说明、右主操作组贴右缘）；主按钮五态文案固定；面板 25%–45% 可拖、可键盘 ←/→、可窄/标准/宽预设、松开记忆 | `test/ui-parity.test.mjs` ⑨：三段顺序、chip 在左、`flex:1`/`margin-left:auto`、五态文案、`role="separator"` + aria 区间、拖动/键盘/记忆代码齐备；真机再验一遍拖动手感 |

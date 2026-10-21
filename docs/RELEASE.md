@@ -23,16 +23,20 @@ README/许可证/素材来源/运行依赖/更新说明：...
 
 工作台市场发布另按 docs/10-MARKET-PUBLISHING.md 执行，附 templates/MARKET-ACCEPTANCE.md 的指定版本手工确认。官方指南复核日期/来源：... 最终安装来源：... 用户确认的项目与执行者：... PR URL/最新提交检查实际执行结果：... 市场目录可见与可安装证据：...。未授权投稿时标不适用，不把 Git push 当市场发布。
 
-## 装机目标：必须是 desktop profile（2026-10-20）
+## 装机目标：Desktop 实际加载的 Harness profile（2026-10-21 更正）
 
-> 上一轮打过一次 tar，装错到了 `~/.dsh/profiles/web`，Desktop 里看不到工作台。下面把"打哪个包、装到哪、怎么验"写死。
+> **更正**：2026-10-20 版把「Desktop 只读 `~/.dsh/profiles/desktop`」写死了，那是把 **CLI 侧的 desktop profile** 当成了 Desktop 的。
+> DSH Desktop 0.12.0 实测：app 用**自己**的 Harness，活动 profile 名恰好叫 `web`，即
+> `~/Library/Application Support/dsh-desktop/harness/profiles/web`。
+> 判据有两条：所有已装工作台都在这份 `package.json` 里；app 自己写的 `desktop-workbenches/market-installs.json` 也只在这个 Harness 下。
+> `~/.dsh/profiles/*` 是 CLI 侧另一份 Harness，**Desktop 不读**——装上去只是"配置层有了"。
 
 两个概念别混：
 
 | 概念 | 取值 | 谁规定 |
 | --- | --- | --- |
-| `dsh.client.platform` | `"web"` | 官方检查器强制；指**客户端运行环境**（渲染进程），不是装机目录 |
-| 装到哪个 profile | `desktop` | 本节 + `scripts/check-install.mjs`；Desktop 只读 `~/.dsh/profiles/desktop` |
+| `dsh.client.platform` | `"web"` | 官方检查器强制；指**客户端运行环境**（渲染进程），与装机目录无关 |
+| 装到哪个 profile | Desktop Harness 的 `web` profile | 本节 + `scripts/check-install.mjs`（自动探测基准目录，不按目录名猜） |
 
 打包：
 
@@ -42,21 +46,25 @@ mkdir -p release && npm pack --pack-destination release
 # release/xyb-community-colorectal-workbench-0.1.0.tgz
 ```
 
-装机（唯一正确命令）：
+装机（macOS / Desktop 0.12.0；先跑一次 `node scripts/check-install.mjs`，它会打印本机判定的基准目录）：
 
 ```bash
-NODE_OPTIONS= npx --yes pnpm@10.15.0 --dir ~/.dsh/profiles/desktop add -w <绝对路径>/release/xyb-community-colorectal-workbench-0.1.0.tgz
+export DSH_HOME="$HOME/Library/Application Support/dsh-desktop/harness"
+export PATH="$DSH_HOME/.desktop-bin:$PATH"          # 用 app 自带的 pnpm / node
+NODE_OPTIONS= npx --yes pnpm@10.15.0 --dir "$DSH_HOME/profiles/web" add -w <绝对路径>/release/xyb-community-colorectal-workbench-0.1.0.tgz
 ```
 
-- `--dir` 必须是 `~/.dsh/profiles/desktop`，不要 web；`NODE_OPTIONS=` 必须置空（宿主 shim 会拦临时目录删除，制造假失败）。
-- 装完把包名加进该 profile `package.json` 的 `dsh.profile.bundles`，Desktop 才加载。
+- `--dir` 指向**上一步脚本打印的 profile 目录**；换机器、换 Desktop 版本、或用户改过 Harness 位置时不要照抄这条命令。
+- `NODE_OPTIONS=` 必须置空（宿主 shim 会拦临时目录删除，制造假失败）。
+- 装完把包名加进**那个 profile** `package.json` 的 `dsh.profile.bundles`，否则依赖装了也不加载。
 
-验证：`node scripts/check-install.mjs` 必须 exit 0；再重启 Desktop 确认工作台出现、业务区渲染 `public/index.html`、`/api/colorectal/health` 返回 `{ok:true}`。**只跑脚本没重启，不能写"装机通过"**。
+验证：`node scripts/check-install.mjs` 必须 exit 0（它会同时核对 `market-installs.json`：有记录=市场安装，无记录=手工/native 安装）；再重启 Harness（提示里的「立即重启」或菜单 **Harness → 重启 Harness**），在**工作台市场 → 已安装**看到条目、左侧入口能打开、`/api/colorectal/health` 返回 `{ok:true}`。**只跑脚本没重启，不能写"装机通过"**；`dump-config` 里出现插件层也不算 UI 加载。
 
 回滚：
 
 ```bash
-NODE_OPTIONS= npx --yes pnpm@10.15.0 --dir ~/.dsh/profiles/desktop remove @xyb-community/colorectal-workbench
+export DSH_HOME="$HOME/Library/Application Support/dsh-desktop/harness"
+NODE_OPTIONS= npx --yes pnpm@10.15.0 --dir "$DSH_HOME/profiles/web" remove @xyb-community/colorectal-workbench
 ```
 
 边界：标准分栏下宿主不按页面内拖动改分栏宽度（页面里的 25%–45% 拖动只作用于页面自绘面板）；要 Desktop 内也可拖，需改 `customFrame=true` 接管原生会话节点（M5 决策，未做）。

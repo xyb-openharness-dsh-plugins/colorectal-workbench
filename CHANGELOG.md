@@ -1,5 +1,11 @@
 # 变更记录
 
+## 2026-10-21 · 装机目标更正（仍是 v0.1.0 开发版，不升版本）
+
+- **更正 2026-10-20 的装机结论**：DSH Desktop 0.12.0 实际加载的是 app **自己**的 Harness `~/Library/Application Support/dsh-desktop/harness/profiles/web`；`~/.dsh/profiles/*` 是 CLI 侧另一份 Harness，Desktop 不读。判据两条：全部已装工作台都在前者；app 写的 `desktop-workbenches/market-installs.json` 只在它下面。
+- `scripts/check-install.mjs` 改为**自动探测基准目录**（Desktop Harness → `DSH_HOME` → `~/.dsh`，逐个打印判定依据），新增 `--profile`，并核对 `market-installs.json` 以区分「市场安装 / 手工 native 安装」。正反两例已在本机验证（exit 0 / exit 1）。
+- `docs/RELEASE.md` 装机段同步改为 `DSH_HOME` + `profiles/web`；换机器、换 Desktop 版本或用户改过 Harness 位置时，先跑脚本看基准目录，不要照抄命令。
+
 ## 2026-10-20 · 开发版 v0.1.0（需求确认后第一轮）
 
 按 [docs/DEV-REQUIREMENTS-2026-10-20.md](docs/DEV-REQUIREMENTS-2026-10-20.md) 的七条要求落地：
