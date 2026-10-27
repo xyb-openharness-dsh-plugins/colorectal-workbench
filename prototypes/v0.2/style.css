@@ -478,3 +478,14 @@ dialog::backdrop{background:rgba(28,43,58,.36);backdrop-filter:blur(2px)}
 .mcard:focus-visible .mface{outline:3px solid var(--violet-deep);outline-offset:2px}
 .actions .hero-ai{display:inline-flex;align-items:center;gap:6px}
 .actions .hero-ai svg{width:15px;height:15px;flex:0 0 15px}
+
+/* 36 号 §2.6 病程状态卡：看板首卡（通用骨架），业务首卡顺延为第二卡。
+   天数由 app.js 的锚点派生，这里只定结构；数字不手填。 */
+.stage-card{border-left:4px solid var(--violet)}
+.stage-card .eyebrow{display:block;margin-bottom:2px}
+.stage-day{display:flex;align-items:baseline;gap:12px;margin:6px 0 4px;flex-wrap:wrap}
+.stage-day b{font-size:28px;line-height:1.2;letter-spacing:-.4px;color:var(--violet-deep);font-weight:700}
+.stage-day small{font-size:11.5px;color:var(--muted)}
+.stage-line{font-size:12.5px;color:var(--ink-2);margin:4px 0 0;line-height:1.7}
+.stage-card .actions{margin-top:14px}
+@media(max-width:640px){.stage-day b{font-size:24px}}

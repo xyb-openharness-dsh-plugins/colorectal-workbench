@@ -16,7 +16,7 @@
    prefers-reduced-motion 降级，全部与原型一致。 */
 
 const APP_INFO = {
-  version: '0.1.0',
+  version: '0.1.1',
   build: '2026-10-18',
   channel: 'prototype',
   channelLabel: '交互原型 · 未接入 DSH'
@@ -388,6 +388,59 @@ const pageHead = (sub) => `<div class="page-head"><div><h1>${esc(PAGES.find(p =>
 const row = (b, p, right = '') => `<div class="row"><div class="row-main"><div><b>${b}</b>${p ? `<p>${p}</p>` : ''}</div></div>${right}</div>`;
 const pill = (t, c = '') => `<span class="pill ${c}">${esc(t)}</span>`;
 
+/* ---------------- 36 号 §2.6 病程状态卡（看板首卡） ----------------
+   四件结构：卡头（D+N · 距下一节点）／大字天数／现状行／出口按钮排。
+   锚点只从档案已有日期取：手术记录优先，没有手术则取当前方案首日；取不到整卡「待初始化」。
+   「下次」只取 rhythm 里医生已排的那条，不由指南间隔推算。 */
+const cardToday = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
+const cardGap = (from, to = cardToday()) => Math.round((Date.parse(`${to}T00:00:00`) - Date.parse(`${from}T00:00:00`)) / 86400000);
+function crcAnchor(p) {
+  const surgery = (p.lines || []).find((l) => /手术/.test(l.name) && /\d{4}-\d{2}-\d{2}/.test(l.name));
+  if (surgery) return { date: surgery.name.match(/(\d{4}-\d{2}-\d{2})/)[1], label: '手术日' };
+  const current = (p.lines || []).find((l) => !l.done && /\d{4}-\d{2}-\d{2}/.test(l.detail || ''));
+  if (current) return { date: current.detail.match(/(\d{4}-\d{2}-\d{2})/)[1], label: '当前方案首日' };
+  const first = (p.cycles || [])[0];
+  if (first && /^\d{4}-\d{2}-\d{2}$/.test(first[1])) return { date: first[1], label: '当前方案首日' };
+  return null;
+}
+function stageCard(p) {
+  const next = (p.rhythm || [])[0] || null;
+  const nextText = next ? `下次：${esc(String(next[3]).replace(/^下次[^：:]*[：:]\s*/, ''))}（${esc(next[0])}）` : '下次：档案里还没有医生排的节点';
+  const active = (p.cycles || []).slice().reverse().find((c) => !c[4]);
+  const running = (p.lines || []).slice().reverse().find((l) => !l.done);
+  const stageState = active ? `${active[3]}（${active[0]}）` : running ? `${running.name}（进行中）` : '当前没有进行中的治疗记录';
+  const primerBtn = '<button class="soft" data-primer-open>疾病概要：结直肠癌是什么？</button>';
+  const anchor = crcAnchor(p);
+  if (!anchor) {
+    return `<section class="card stage-card is-empty" aria-label="病程状态卡：待初始化">
+      <span class="eyebrow">D+N 状态卡 · 待初始化</span>
+      <div class="stage-day"><b>待初始化</b><small>档案里没有手术日或治疗起始日，天数算不出来</small></div>
+      <p class="stage-line">${pill('阶段：' + p.stage, 'grey')} · ${esc(stageState)} · ${nextText}</p>
+      <div class="actions">
+        <button class="primary" data-action="go-records">开始三步初始化</button>
+        ${primerBtn}
+      </div>
+      <p class="small-note">三步初始化：① 选资料目录 → ② 导入手术记录或出院小结 → ③ 核对日期（入口：设置）。</p>
+    </section>`;
+  }
+  const gap = cardGap(anchor.date);
+  const nd = next ? (String(next[3]).match(/(\d{4}-\d{2}-\d{2})/) || [])[1] : null;
+  const toNext = nd ? cardGap(cardToday(), nd) : null;
+  const eyebrow = `D+${gap} 状态卡 · ${toNext == null ? '距下一节点：以医生排期为准' : `距下次节点约 ${toNext} 天`}`;
+  return `<section class="card stage-card" aria-label="病程状态卡：${esc(p.stage)}">
+    <span class="eyebrow">${eyebrow}</span>
+    <div class="stage-day"><b>第 ${gap} 天</b><small>锚点 ${esc(anchor.date)}（${esc(anchor.label)} = Day 0）· 由档案日期算出，不手填</small></div>
+    <p class="stage-line">${pill(p.stage, 'violet')} · ${esc(running ? running.name : '当前方案')} · ${esc(stageState)} · ${nextText}</p>
+    <div class="actions">
+      <button class="primary" data-action="go-treatment">看治疗周期（按天）→</button>
+      ${primerBtn}
+    </div>
+  </section>`;
+}
+
 /* ---------------- views ---------------- */
 function vDashboard() {
   const p = P(), m = M();
@@ -404,7 +457,7 @@ function vDashboard() {
     ${p.rhythm.map(r => row(`<b>${r[0]}</b>`, `${r[1]} — ${r[2]}`, `<small>${esc(r[3])}</small>`)).join('')}
     <p class="small-note">以上为指南常见节奏摘录，仅供准备讨论；实际安排以你的医生为准。</p></div>`;
   const cards = (DASH_KEYS[state.profile] || []).filter(k => m[k]).map(k => mcard(k, m[k])).join('');
-  return `<div class="page-enter">${pageHead()}
+  return `<div class="page-enter">${pageHead()}${stageCard(p)}
   <div class="hero"><div><span class="eyebrow">当前情况</span><h1>${esc(p.headline)}</h1><p>${esc(p.mindset)}</p>
     <div class="actions"><button class="primary" data-action="go-timeline">看病情一图秀</button><button class="soft" data-action="go-subtype">我的分子分型</button><button class="soft hero-ai" data-action="agent-open">${icon('chat')}AI 对话</button></div></div>
     <div class="hero-mascot" aria-hidden="true"><span style="font-size:56px">🫂</span></div></div>
@@ -1065,6 +1118,7 @@ document.addEventListener('click', (e) => {
     profiles: dlgProfiles, settings: dlgSettings, about: dlgAbout, help: dlgHelp,
     close: closeDialog, 'open-store': () => toast('资料目录已激活（演示）'),
     'go-review': () => { state.view = 'review'; location.hash = 'review'; render(); },
+    'go-treatment': () => { state.view = 'treatment'; location.hash = 'treatment'; render(); },
     'go-stoma': () => { state.view = 'stoma'; location.hash = 'stoma'; render(); },
     'go-labs': () => { state.view = 'labs'; location.hash = 'labs'; render(); },
     'go-timeline': () => { state.view = 'timeline'; location.hash = 'timeline'; render(); },

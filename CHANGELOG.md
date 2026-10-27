@@ -1,5 +1,18 @@
 # 变更记录
 
+## 2026-10-27 · 36 号 v2 补齐（指南可点+状态卡）· v0.1.1
+
+- **指南原件链接补齐（L1–L6 / §2.5）**：`primer-data.js` 的 sources 与 evidence 表逐行改为可点链接或显式 `nolink`+note。
+  - 已取得：NCCN 患者版结肠癌 PDF（56 页）、直肠癌 PDF（64 页），`kind: 'pdf'`；均实测 HTTP 200 + `application/pdf`。
+  - 官方入口页：NCCN 临床版 Colon Cancer（id=1428）与 Rectal Cancer（id=1461），`entry: true` + `kind: 'hub'`，注明需自行注册。
+  - 二次来源：CSCO 2026 版 MedSci 收录摘要页（`kind: 'hub'`，注明非官方全文）；ClinicalTrials.gov 检索入口（`kind: 'registry'`）。
+  - 未取得（`nolink`+note）：CSCO 2025（官方无公开免费全文）、ESMO 2026 更新（原文/DOI 待取得）、AJCC 8th ed（付费手册，章节 DOI 已 Deleted）、NCCN 中文译本。
+  - 链接断言 29 项结构全过；`--http` 实测 PDF 均为 `application/pdf`。
+- **状态卡四件（§2.6）**：看板首卡新增 `D+N 状态卡`，含卡头、锚点派生大字天数、现状行（阶段原文+状态+下次）、出口按钮排（主按钮进治疗周期 + 「疾病概要：结直肠癌是什么？」）；无锚点时显示「待初始化」并指向三步初始化。天数由档案日期派生，不手填。
+- **顶栏「?」手写（L40/L41）**：原型与开发版 `.top-actions` / `.tb-actions` 各手写一个最小 `data-primer-open` 按钮，不补 class/aria（由模块接管补齐）；`index.html` 其余骨架保持原样。
+- **模式件同步**：`primer.js` / `primer.css` 覆盖为 starter 2026-10-27 版（含 §2.5 链接渲染、§4.3 排版、P9 对齐）；开发版 `public/` 同步同一份三件套。
+- **闸门**：新增 `scripts/check-primer-links.mjs`（starter L1–L12 版）并接入 `npm run check`；`scripts/probe-disease-primer.mjs` 更新为 P1–P9 + E0。
+
 ## 2026-10-21 · 装机目标更正（仍是 v0.1.0 开发版，不升版本）
 
 - **更正 2026-10-20 的装机结论**：DSH Desktop 0.12.0 实际加载的是 app **自己**的 Harness `~/Library/Application Support/dsh-desktop/harness/profiles/web`；`~/.dsh/profiles/*` 是 CLI 侧另一份 Harness，Desktop 不读。判据两条：全部已装工作台都在前者；app 写的 `desktop-workbenches/market-installs.json` 只在它下面。
