@@ -1,6 +1,6 @@
 {
   "name": "@xyb-community/colorectal-workbench",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "小畅宝 Colopal：本机优先的结直肠癌病程整理、造口与肠道功能记录、复诊准备工作台",
   "private": true,
   "type": "module",
